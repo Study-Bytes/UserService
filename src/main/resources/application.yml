@@ -1,0 +1,38 @@
+spring:
+  application:
+    name: CourseWork
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/user_service
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update   # для разработки, потом поменяем на validate
+    show-sql: true
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  flyway:
+    enabled: false
+
+server:
+  port: 8081
+
+logging:
+  level:
+    root: INFO
+    org.springframework.web: INFO
+    org.springframework.security: DEBUG
+    ru.example: DEBUG
+
+app:
+  jwt:
+    secret: "my-super-secret-jwt-key-which-is-at-least-32-chars"
+    access-token-expiration-ms: 900000
+    refresh-token-expiration-ms: 604800000
