@@ -1,0 +1,260 @@
+openapi: 3.0.4
+info:
+  title: User Service API
+  version: 1.0.0
+  description: >
+    Сервис управления пользователями и аутентификацией. Обрабатывает регистрацию, вход, обновление токенов и управление профилями пользователей.
+servers:
+  - url: http://localhost:8081
+    description: Local Dev Server
+
+tags:
+  - name: Authentication
+    description: Регистрация, вход, обновление токенов
+  - name: Users
+    description: Управление пользователями и профилями
+
+paths:
+  /api/v1/auth/register:
+    post:
+      summary: Регистрация нового пользователя
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '200':
+          description: Пользователь успешно зарегистрирован
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "User registered successfully"
+        '400':
+          description: Ошибка валидации запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Пользователь с таким email уже существует
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Ошибка сервиса
+
+  /api/v1/auth/login:
+    post:
+      summary: Аутентификация пользователя
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Успешная аутентификация
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Ошибка валидации запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Неверные учетные данные
+        '500':
+          description: Ошибка сервиса
+
+  /api/v1/auth/refresh:
+    post:
+      summary: Обновление access токена
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '200':
+          description: Новый access токен выдан
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken:
+                    type: string
+                    description: Новый JWT access токен
+        '400':
+          description: Ошибка валидации запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Невалидный или просроченный refresh токен
+        '500':
+          description: Ошибка сервиса
+
+  /api/v1/users/me:
+    get:
+      summary: Получить профиль текущего пользователя
+      tags: [Users]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Профиль пользователя
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDto'
+        '401':
+          description: Неавторизованный доступ
+        '500':
+          description: Ошибка сервиса
+
+  /api/v1/users/{id}:
+    get:
+      summary: Получить пользователя по ID (для администраторов)
+      tags: [Users]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: ID пользователя
+      responses:
+        '200':
+          description: Информация о пользователе
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDto'
+        '401':
+          description: Неавторизованный доступ
+        '403':
+          description: Недостаточно прав (требуется роль администратора)
+        '404':
+          description: Пользователь не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Ошибка сервиса
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >
+        JWT токен, полученный при аутентификации через /auth/login.
+        Токен должен быть передан в заголовке Authorization: Bearer <token>
+
+  schemas:
+    RegisterRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 6
+      example:
+        email: "user@example.com"
+        password: "securePassword123"
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+      example:
+        email: "user@example.com"
+        password: "securePassword123"
+
+    RefreshRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+      example:
+        refreshToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+
+    AuthResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        tokenType:
+          type: string
+      example:
+        accessToken: "eyJhbGciOiJIUzI1NiJ9eyJzdWIi..."
+        refreshToken: "eyJhbGciOiJIUzI1NiJ9eyJzdWIi..."
+        tokenType: "Bearer"
+
+    UserDto:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        fullName:
+          type: string
+        role:
+          type: string
+      example:
+        id: 2
+        email: "test2@mail.com"
+        fullName: "Тест Тестов"
+        role: "STUDENT"
+
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        code:
+          type: integer
+        timestamp:
+          type: string
+          format: date-time
+        path:
+          type: string
+      example:
+        message: "User with email already exists"
+        code: 409
+        timestamp: "2026-01-25T12:00:00Z"
+        path: "/api/auth/register"
