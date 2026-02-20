@@ -8,7 +8,7 @@ public class RefreshRequest {
     @NotBlank
     private String refreshToken;
 
-    public String getRefreashToken() {
+    public String getRefreshToken() {
         return refreshToken;
     }
     public void setRefreshToken(String refreshToken) {

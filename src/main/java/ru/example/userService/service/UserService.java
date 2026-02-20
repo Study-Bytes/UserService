@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import ru.example.userService.dto.RegisterRequest;
 import ru.example.userService.entity.Role;
 import ru.example.userService.entity.User;
+import ru.example.userService.exception.EmailAlreadyTakenException;
 import ru.example.userService.repository.UserRepository;
 import ru.example.userService.security.SecurityConfig;
 
@@ -30,7 +31,7 @@ public class UserService {
         Optional<User> exists = userRepository.findByEmail(request.getEmail());
         if (exists.isPresent()) {
             log.warn("Reqistration failed: email already taken: {}",  request.getEmail());
-            throw new IllegalArgumentException("email already taken");
+            throw new EmailAlreadyTakenException(request.getEmail());
         }
         User user = new User();
         user.setEmail(request.getEmail());
@@ -38,7 +39,7 @@ public class UserService {
         user.setRole(Role.STUDENT);
         user.setFullName(request.getFullName());
         User savedUser = userRepository.save(user);
-        log.info("User registered id={}, email={}",  savedUser.getId());
+        log.info("User registered id={}, email={}", savedUser.getId(), savedUser.getEmail());
         return savedUser;
     }
 
