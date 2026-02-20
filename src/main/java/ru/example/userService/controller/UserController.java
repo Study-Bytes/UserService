@@ -23,6 +23,7 @@ public class UserController {
         this.userService = userService;
     }
 
+    //добавить регулярку на email
     @GetMapping("/me")
     public UserDto me(Authentication authentication) {
         String email = authentication.getName();

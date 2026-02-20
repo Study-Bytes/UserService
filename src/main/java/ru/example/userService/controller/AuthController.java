@@ -18,8 +18,6 @@ import ru.example.userService.service.UserService;
 
 import java.util.Map;
 
-//контроллер для аутенфикации (/api/auth/* (register, login, refresh))
-
 @RestController
 @RequestMapping("/api/v1/auth")
 public class AuthController {
@@ -36,20 +34,26 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request) {
         User saved = userService.register(request);
-        log.info("Register endpoint: created user id = {}, email = {}", saved.getId(), saved.getEmail());
-        return ResponseEntity.ok("User registered successfully");
+        log.info("Register endpoint: created user id={}, email={}", saved.getId(), saved.getEmail());
+        return ResponseEntity.ok(Map.of("message", "User registered successfully"));
     }
 
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         AuthResponse authResponse = authService.login(request);
-        log.info("Login endpoint: success for email = {}", request.getEmail());
+        log.info("Login endpoint: success for email={}", request.getEmail());
         return ResponseEntity.ok(authResponse);
     }
 
     @PostMapping("/refresh")
     public ResponseEntity<?> refresh(@Valid @RequestBody RefreshRequest request) {
         String newAccess = authService.refreshAccessToken(request);
-        return ResponseEntity.ok(Map.of("accesstoken", newAccess));
+        return ResponseEntity.ok(Map.of("accessToken", newAccess));
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout(@Valid @RequestBody RefreshRequest request) {
+        authService.logout(request.getRefreshToken());
+        return ResponseEntity.ok(Map.of("message", "Logged out successfully"));
     }
 }

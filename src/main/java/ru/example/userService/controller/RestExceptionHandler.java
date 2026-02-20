@@ -1,25 +1,76 @@
 package ru.example.userService.controller;
 
+import jakarta.persistence.EntityNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import ru.example.userService.exception.EmailAlreadyTakenException;
+import ru.example.userService.exception.InvalidTokenException;
 
+import java.time.Instant;
 import java.util.Map;
 
+@RestControllerAdvice
 public class RestExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(RestExceptionHandler.class);
 
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<?> handleIllegalArg(IllegalArgumentException e) {
-        log.warn("Bad request: {}", e.getMessage());
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+    //409 ошибка на дублирующий email
+    @ExceptionHandler(EmailAlreadyTakenException.class)
+    public ResponseEntity<?> handleEmailTaken(EmailAlreadyTakenException e) {
+        log.warn("Email conflict: {}", e.getMessage());
+        return buildError(HttpStatus.CONFLICT, e.getMessage());
     }
 
+    //404 пользователь не найден
+    @ExceptionHandler({UsernameNotFoundException.class, EntityNotFoundException.class})
+    public ResponseEntity<?> handleNotFound(RuntimeException e) {
+        log.warn("Not found: {}", e.getMessage());
+        return buildError(HttpStatus.NOT_FOUND, e.getMessage());
+    }
+
+    //400 ошибка на невалидный email и короткий пароль
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<?> handleValidation(MethodArgumentNotValidException e) {
+        String message = e.getBindingResult().getFieldErrors().stream()
+                .map(fe -> fe.getField() + ": " + fe.getDefaultMessage())
+                .reduce((a, b) -> a + "; " + b)
+                .orElse("Validation failed");
+        log.warn("Validation error: {}", message);
+        return buildError(HttpStatus.BAD_REQUEST, message);
+    }
+
+    // 401 — невалидный или отозванный токен
+    @ExceptionHandler(InvalidTokenException.class)
+    public ResponseEntity<?> handleInvalidToken(InvalidTokenException e) {
+        log.warn("Invalid token: {}", e.getMessage());
+        return buildError(HttpStatus.UNAUTHORIZED, e.getMessage());
+    }
+
+    // 401 — неверные credentials при логине
+    @ExceptionHandler(BadCredentialsException.class)
+    public ResponseEntity<?> handleBadCredentials(BadCredentialsException e) {
+        log.warn("Bad credentials: {}", e.getMessage());
+        return buildError(HttpStatus.UNAUTHORIZED, "Invalid email or password");
+    }
+
+    //500 все остальное
     @ExceptionHandler(Exception.class)
     public ResponseEntity<?> handleOther(Exception e) {
-        log.error("internal error: {}", e.getMessage());
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Internal server error"));
+        log.error("Internal error: {}", e.getMessage(), e);
+        return buildError(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error");
+    }
+
+    private ResponseEntity<Map<String, Object>> buildError(HttpStatus status, String message) {
+        return ResponseEntity.status(status).body(Map.of(
+                "message", message,
+                "code", status.value(),
+                "timestamp", Instant.now().toString()
+        ));
     }
 }
