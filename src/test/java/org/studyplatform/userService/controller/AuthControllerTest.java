@@ -80,7 +80,7 @@ class AuthControllerTest {
 
     @Test
     void login_WithValidCredentials_ShouldReturnAuthResponse() throws Exception {
-        var response = new AuthResponse("access-token", "refresh-token", 5L, "user@example.com", "STUDENT");
+        var response = new AuthResponse("access-token", "refresh-token", "Bearer", 900L);
         when(authService.login(any(LoginRequest.class))).thenReturn(response);
 
         mockMvc.perform(post("/api/v1/auth/login")
@@ -89,7 +89,8 @@ class AuthControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").value("access-token"))
                 .andExpect(jsonPath("$.refreshToken").value("refresh-token"))
-                .andExpect(jsonPath("$.email").value("user@example.com"));
+                .andExpect(jsonPath("$.tokenType").value("Bearer"))
+                .andExpect(jsonPath("$.expiresIn").value(900));
     }
 
     @Test
