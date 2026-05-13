@@ -1,10 +1,10 @@
-package ru.example.userService.repository;
+package org.studyplatform.userService.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
-import ru.example.userService.entity.RefreshToken;
-import ru.example.userService.entity.User;
+import org.studyplatform.userService.entity.RefreshToken;
+import org.studyplatform.userService.entity.User;
 
 import java.util.Optional;
 
