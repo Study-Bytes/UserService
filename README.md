@@ -264,7 +264,7 @@ VPS_HOST
 VPS_PORT
 VPS_USER
 VPS_SSH_KEY
-VPS_DEPLOY_PATH
+VPS_DEPLOY_BASE_PATH
 ```
 
 Опционально можно добавить:
@@ -286,7 +286,7 @@ http://127.0.0.1:8081/health
 3. Убедитесь, что workflow `UserService CI/CD` завершился успешно.
 4. Проверьте шаги `Run tests`, `Validate OpenAPI contract` и `Build Docker image`.
 5. После merge в `main` проверьте deploy job.
-6. На VPS убедитесь, что рядом с проектом есть `.env`.
+6. На VPS убедитесь, что в `$VPS_DEPLOY_BASE_PATH/UserService` есть `.env`.
 7. Проверьте контейнеры командой:
 
 ```bash
