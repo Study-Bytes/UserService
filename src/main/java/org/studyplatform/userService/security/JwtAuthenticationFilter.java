@@ -1,4 +1,4 @@
-package ru.example.userService.security;
+package org.studyplatform.userService.security;
 
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
@@ -12,22 +12,18 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
-import ru.example.userService.repository.UserRepository;
 
 import java.io.IOException;
 
-//фильтр извлекает Access токен из заголовка Authentication и при валидном ставит Authentication в SecurityContext
-
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final Logger logger = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
+
     private final JwtUtil jwtUtil;
     private final CustomUserDetailsService userDetailsService;
-    private final UserRepository userRepository;
 
-    public JwtAuthenticationFilter(JwtUtil jwtUtil, CustomUserDetailsService userDetailsService, UserRepository userRepository) {
+    public JwtAuthenticationFilter(JwtUtil jwtUtil, CustomUserDetailsService userDetailsService) {
         this.jwtUtil = jwtUtil;
         this.userDetailsService = userDetailsService;
-        this.userRepository = userRepository;
     }
 
     @Override
@@ -41,25 +37,35 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             String header = request.getHeader("Authorization");
             if (StringUtils.hasText(header) && header.startsWith("Bearer ")) {
-                String token = header.substring(7);
-                if (jwtUtil.validateToken(token)) {
-                    Claims claims = jwtUtil.parseClaims(token);
-                    String email = claims.getSubject();
-                    if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                        var userDetails = userDetailsService.loadUserByUsername(email);
-                        UsernamePasswordAuthenticationToken authentication =
-                                new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
-                        authentication.setDetails(
-                                new WebAuthenticationDetailsSource().buildDetails(request)
-                        );
-                        SecurityContextHolder.getContext().setAuthentication(authentication);
-                        logger.debug("Authenticated user {} via JWT", email);
-                    }
-                }
+                authenticateRequest(request, header.substring(7));
             }
         } catch (Exception e) {
-            logger.error("cannot set user authentication: {}", e.getMessage());
+            logger.warn("JWT authentication was skipped: {}", e.getMessage());
         }
+
         filterChain.doFilter(request, response);
+    }
+
+    private void authenticateRequest(HttpServletRequest request, String token) {
+        if (!jwtUtil.validateToken(token)
+                || SecurityContextHolder.getContext().getAuthentication() != null) {
+            return;
+        }
+
+        Claims claims = jwtUtil.parseClaims(token);
+        String email = claims.get("email", String.class);
+
+        if (!StringUtils.hasText(email)) {
+            return;
+        }
+
+        var userDetails = userDetailsService.loadUserByUsername(email);
+        var authentication = new UsernamePasswordAuthenticationToken(
+                userDetails,
+                null,
+                userDetails.getAuthorities()
+        );
+        authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+        SecurityContextHolder.getContext().setAuthentication(authentication);
     }
 }
