@@ -1,4 +1,4 @@
-package ru.example.userService.service;
+package org.studyplatform.userService.service;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -6,15 +6,15 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import ru.example.userService.dto.AuthResponse;
-import ru.example.userService.dto.LoginRequest;
-import ru.example.userService.dto.RefreshRequest;
-import ru.example.userService.entity.RefreshToken;
-import ru.example.userService.entity.User;
-import ru.example.userService.exception.InvalidTokenException;
-import ru.example.userService.repository.RefreshTokenRepository;
-import ru.example.userService.repository.UserRepository;
-import ru.example.userService.security.JwtUtil;
+import org.studyplatform.userService.dto.AuthResponse;
+import org.studyplatform.userService.dto.LoginRequest;
+import org.studyplatform.userService.dto.RefreshRequest;
+import org.studyplatform.userService.entity.RefreshToken;
+import org.studyplatform.userService.entity.User;
+import org.studyplatform.userService.exception.InvalidTokenException;
+import org.studyplatform.userService.repository.RefreshTokenRepository;
+import org.studyplatform.userService.repository.UserRepository;
+import org.studyplatform.userService.security.JwtUtil;
 
 import java.time.Instant;
 
@@ -43,7 +43,7 @@ public class AuthService {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new IllegalArgumentException("User not found after auth"));
         refreshTokenRepository.revokeAllByUser(user);
-        String accessToken = jwtUtil.generateAccessToken(user.getEmail(), user.getId(), user.getRole().name());
+        String accessToken = jwtUtil.generateAccessToken(user);
         String refreshTokenRaw = jwtUtil.generateRefreshToken(user.getEmail(), user.getId());
 
         Instant expiresAt = jwtUtil.getRefreshExpiration();
@@ -51,7 +51,7 @@ public class AuthService {
         refreshTokenRepository.save(refreshToken);
 
         log.info("User {} logged in, issued tokens", user.getEmail());
-        return new AuthResponse(accessToken, refreshTokenRaw, user.getId(), user.getEmail(), user.getRole().name());
+        return new AuthResponse(accessToken, refreshTokenRaw, "Bearer", jwtUtil.getAccessExpirationSeconds());
     }
 
     @Transactional
@@ -77,7 +77,7 @@ public class AuthService {
             throw new InvalidTokenException("Refresh token expired");
         }
         User user = storedToken.getUser();
-        String newAccessToken = jwtUtil.generateAccessToken(user.getEmail(), user.getId(), user.getRole().name());
+        String newAccessToken = jwtUtil.generateAccessToken(user);
         log.info("Issued new access token for userId={}", user.getId());
         return newAccessToken;
     }
