@@ -1,4 +1,4 @@
-package ru.example.userService.dto;
+package org.studyplatform.userService.dto;
 
 public class UserDto {
     private Long id;
