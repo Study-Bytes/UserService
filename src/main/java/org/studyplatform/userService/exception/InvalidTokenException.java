@@ -1,4 +1,4 @@
-package ru.example.userService.exception;
+package org.studyplatform.userService.exception;
 
 public class InvalidTokenException extends RuntimeException {
     public InvalidTokenException(String message) {

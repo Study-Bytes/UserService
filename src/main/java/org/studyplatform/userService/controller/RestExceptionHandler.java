@@ -1,4 +1,4 @@
-package ru.example.userService.controller;
+package org.studyplatform.userService.controller;
 
 import jakarta.persistence.EntityNotFoundException;
 import org.slf4j.Logger;
@@ -10,8 +10,9 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import ru.example.userService.exception.EmailAlreadyTakenException;
-import ru.example.userService.exception.InvalidTokenException;
+import org.studyplatform.userService.exception.EmailAlreadyTakenException;
+import org.studyplatform.userService.exception.InvalidTokenException;
+import org.studyplatform.userService.exception.UserNotFoundException;
 
 import java.time.Instant;
 import java.util.Map;
@@ -28,7 +29,7 @@ public class RestExceptionHandler {
     }
 
     //404 пользователь не найден
-    @ExceptionHandler({UsernameNotFoundException.class, EntityNotFoundException.class})
+    @ExceptionHandler({UsernameNotFoundException.class, EntityNotFoundException.class, UserNotFoundException.class})
     public ResponseEntity<?> handleNotFound(RuntimeException e) {
         log.warn("Not found: {}", e.getMessage());
         return buildError(HttpStatus.NOT_FOUND, e.getMessage());
