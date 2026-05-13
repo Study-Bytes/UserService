@@ -1,0 +1,27 @@
+# Maven
+target/
+*.class
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Local environment
+.env
+.env.*
+!.env.example
+application-local.properties
+application-local.yml
+
+# Secrets and private keys
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+
+# OS files
+.DS_Store
+Thumbs.db
