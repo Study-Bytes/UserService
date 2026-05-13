@@ -1,0 +1,9 @@
+.git
+.gitignore
+.idea
+target
+*.iml
+.env
+.env.*
+!.env.example
+.DS_Store
