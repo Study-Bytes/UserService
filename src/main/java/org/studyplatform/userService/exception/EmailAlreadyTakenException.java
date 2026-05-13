@@ -1,4 +1,4 @@
-package ru.example.userService.exception;
+package org.studyplatform.userService.exception;
 
 public class EmailAlreadyTakenException extends RuntimeException {
     public EmailAlreadyTakenException(String email) {
