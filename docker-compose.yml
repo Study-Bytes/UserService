@@ -11,7 +11,7 @@ services:
       DB_USERNAME: ${POSTGRES_USER:-postgres}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     ports:
-      - "${SERVER_PORT:-8089}:${SERVER_PORT:-8089}"
+      - "${SERVER_PORT:-8081}:${SERVER_PORT:-8081}"
     depends_on:
       postgres:
         condition: service_healthy
@@ -24,7 +24,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     ports:
-      - "${POSTGRES_PORT:-6766}:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
