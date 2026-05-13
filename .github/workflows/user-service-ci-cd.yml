@@ -1,0 +1,152 @@
+name: UserService CI/CD
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: user-service-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: Build, test, OpenAPI and Docker check
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: user_service
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d user_service"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      SERVER_PORT: 8081
+      DB_URL: jdbc:postgresql://localhost:5432/user_service
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      JWT_PRIVATE_KEY: ''
+      JWT_KEY_ID: user-service-rsa-1
+      JWT_ISSUER: study-platform-user-service
+      JWT_AUDIENCE: study-platform
+      JWT_ACCESS_EXPIRATION_MINUTES: 15
+      JWT_REFRESH_EXPIRATION_DAYS: 7
+      JPA_DDL_AUTO: update
+      JPA_SHOW_SQL: false
+      HIBERNATE_FORMAT_SQL: false
+      FLYWAY_ENABLED: false
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Make Maven wrapper executable
+        run: chmod +x ./mvnw
+
+      - name: Run tests
+        run: ./mvnw -B clean verify
+
+      - name: Validate OpenAPI contract
+        run: ruby -e "require 'yaml'; YAML.load_file('openapi.yml')"
+
+      - name: Check OpenAPI contract is committed
+        run: git diff --exit-code openapi.yml
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: studybytes/user-service:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy UserService to VPS
+    runs-on: ubuntu-latest
+    needs: ci
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    environment:
+      name: production
+
+    steps:
+      - name: Validate required deployment secrets
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_DEPLOY_PATH: ${{ secrets.VPS_DEPLOY_PATH }}
+        run: |
+          test -n "$VPS_HOST" || (echo "VPS_HOST secret is missing" && exit 1)
+          test -n "$VPS_PORT" || (echo "VPS_PORT secret is missing" && exit 1)
+          test -n "$VPS_USER" || (echo "VPS_USER secret is missing" && exit 1)
+          test -n "$VPS_SSH_KEY" || (echo "VPS_SSH_KEY secret is missing" && exit 1)
+          test -n "$VPS_DEPLOY_PATH" || (echo "VPS_DEPLOY_PATH secret is missing" && exit 1)
+
+      - name: Configure SSH
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/user_service_deploy_key
+          chmod 600 ~/.ssh/user_service_deploy_key
+          ssh-keyscan -p "$VPS_PORT" "$VPS_HOST" >> ~/.ssh/known_hosts
+
+      - name: Deploy over SSH
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_DEPLOY_PATH: ${{ secrets.VPS_DEPLOY_PATH }}
+          VPS_HEALTHCHECK_URL: ${{ secrets.VPS_HEALTHCHECK_URL }}
+        run: |
+          HEALTHCHECK_URL="${VPS_HEALTHCHECK_URL:-http://127.0.0.1:8081/health}"
+          ssh -i ~/.ssh/user_service_deploy_key -p "$VPS_PORT" "$VPS_USER@$VPS_HOST" \
+            "set -euo pipefail
+             cd '$VPS_DEPLOY_PATH'
+             git config --global --add safe.directory '$VPS_DEPLOY_PATH'
+             test -f .env || (echo '.env is missing on VPS. Create it before deployment.' && exit 1)
+             git fetch origin main
+             git checkout main
+             git pull --ff-only origin main
+             docker compose up -d --build
+             docker compose ps
+             for attempt in \$(seq 1 40); do
+               if curl -fsS '$HEALTHCHECK_URL'; then
+                 exit 0
+               fi
+               echo \"Waiting for UserService health check... attempt \$attempt/40\"
+               sleep 3
+             done
+             docker compose logs --tail=200 user-service
+             exit 1"

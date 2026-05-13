@@ -1,21 +1,23 @@
 # UserService
 
-UserService is a Spring Boot microservice for the Study Platform coursework project. It manages user registration, authentication, JWT access tokens, refresh tokens, user profile endpoints, and public JWKS data for other services.
+UserService - это Spring Boot микросервис для учебной платформы Study Platform. Он отвечает за регистрацию пользователей, аутентификацию, выдачу JWT access tokens, работу с refresh tokens, профили пользователей и публичный JWKS endpoint для проверки токенов другими сервисами.
 
-## Main Features
+## Основные возможности
 
-- User registration with default `STUDENT` role
-- Login with access and refresh tokens
-- Refresh token persistence and revocation
-- JWT access tokens signed with RS256
-- Public JWKS endpoint for token verification by other services
-- Role support: `STUDENT`, `TEACHER`, `ADMIN`
-- Protected user profile endpoints
-- OpenAPI and Swagger UI documentation
-- Health endpoint for deployment checks
-- PostgreSQL runtime database and isolated H2 test database
+- Регистрация пользователя с ролью `STUDENT` по умолчанию
+- Вход по email и паролю
+- Выдача access и refresh токенов
+- Хранение и отзыв refresh токенов
+- JWT access токены с подписью RS256
+- Публичный JWKS endpoint для проверки JWT другими сервисами
+- Поддержка ролей `STUDENT`, `TEACHER`, `ADMIN`
+- Защищенные endpoints профиля пользователя
+- OpenAPI контракт
+- PostgreSQL для запуска приложения
+- H2 база для тестов
+- Docker Compose для локального запуска
 
-## Technology Stack
+## Стек
 
 - Java 21
 - Spring Boot 3.4
@@ -23,62 +25,58 @@ UserService is a Spring Boot microservice for the Study Platform coursework proj
 - Spring Security
 - Spring Data JPA
 - PostgreSQL
-- H2 for tests
+- H2 для тестов
 - JJWT
 - Springdoc OpenAPI
 - Maven
 - Docker Compose
 
-## Runtime Ports
+## Порты
 
-By default:
+По умолчанию:
 
-- UserService runs on `8089`
-- PostgreSQL is exposed on host port `6766`
+- UserService запускается на `8081`
+- PostgreSQL доступен на host-порту `5432`
 
-These values can be overridden with environment variables.
+Значения можно изменить через переменные окружения.
 
-## API Documentation
+## Документация API
 
-After starting the application, OpenAPI is available at:
-
-```text
-http://localhost:8089/v3/api-docs
-```
-
-Swagger UI is available at:
+OpenAPI контракт хранится в файле:
 
 ```text
-http://localhost:8089/swagger-ui/index.html
+openapi.yml
 ```
 
-## Health Endpoint
-
-The health endpoint is public and can be used by local checks, deployment scripts, or monitoring:
+После запуска приложения Swagger UI доступен по адресу:
 
 ```text
-GET http://localhost:8089/health
+http://localhost:8081/swagger-ui/index.html
 ```
 
-Example response:
+OpenAPI JSON от Springdoc доступен по адресу:
 
-```json
-{
-  "status": "UP",
-  "service": "UserService",
-  "timestamp": "2026-05-13T14:00:00Z"
-}
+```text
+http://localhost:8081/v3/api-docs
+```
+
+## Health Check
+
+Health endpoint описан в OpenAPI для проверки доступности сервиса:
+
+```text
+GET http://127.0.0.1:8081/health
 ```
 
 ## Auth Endpoints
 
-Base path:
+Базовый путь:
 
 ```text
 /api/v1/auth
 ```
 
-Available endpoints:
+Доступные endpoints:
 
 ```text
 POST /api/v1/auth/register
@@ -90,26 +88,26 @@ GET  /api/v1/auth/.well-known/jwks.json
 
 ## User Endpoints
 
-Base path:
+Базовый путь:
 
 ```text
 /api/v1/users
 ```
 
-Available endpoints:
+Доступные endpoints:
 
 ```text
 GET /api/v1/users/me
 GET /api/v1/users/{id}
 ```
 
-`GET /api/v1/users/{id}` is restricted to users with the `ADMIN` role.
+`GET /api/v1/users/{id}` доступен только пользователям с ролью `ADMIN`.
 
-## JWT Contract
+## JWT Контракт
 
-UserService issues access JWT tokens signed with the RS256 algorithm. The private RSA key stays only inside UserService. Other services must verify access tokens with the public key from JWKS.
+UserService выпускает access JWT tokens, подписанные алгоритмом RS256. Приватный RSA ключ должен храниться только внутри UserService. Другие сервисы проверяют access tokens через публичный ключ из JWKS.
 
-Access token claims:
+Пример claims в access token:
 
 ```json
 {
@@ -125,17 +123,17 @@ Access token claims:
 }
 ```
 
-The access token must not contain passwords, refresh token values, token hashes, or other sensitive data.
+Access token не должен содержать пароль, refresh token, token hash или другие секретные данные.
 
 ## JWKS
 
 JWKS endpoint:
 
 ```text
-GET http://localhost:8089/api/v1/auth/.well-known/jwks.json
+GET http://localhost:8081/api/v1/auth/.well-known/jwks.json
 ```
 
-The response exposes only public RSA key fields:
+Ответ содержит только публичные поля RSA ключа:
 
 ```json
 {
@@ -152,101 +150,151 @@ The response exposes only public RSA key fields:
 }
 ```
 
-Private key fields such as `d`, `p`, and `q` must never be returned.
+Приватные поля ключа, например `d`, `p`, `q`, не должны возвращаться наружу.
 
-## RSA Private Key Generation
+## Генерация RSA Private Key
 
-Generate a private RSA key for local development:
+Сгенерировать приватный RSA ключ для локальной разработки:
 
 ```bash
 openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out jwt-private-key.pem
 ```
 
-Print the key as a single environment variable value:
+Вывести ключ в формате, удобном для `.env`:
 
 ```bash
 awk 'NF {sub(/\r/, ""); printf "%s\\n",$0;}' jwt-private-key.pem
 ```
 
-Example `.env` value:
+Пример значения в `.env`:
 
 ```text
 JWT_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----
 ```
 
-Do not commit `.env`, `*.pem`, or `*.key` files.
+Нельзя коммитить `.env`, `*.pem`, `*.key` и другие локальные секреты.
 
-## Environment Variables
+## Переменные окружения
 
-| Variable | Default | Description |
+| Переменная | Значение по умолчанию | Описание |
 | --- | --- | --- |
-| `SERVER_PORT` | `8089` | HTTP port for UserService |
-| `DB_URL` | `jdbc:postgresql://localhost:6766/user_service` | PostgreSQL JDBC URL |
-| `DB_USERNAME` | `postgres` | PostgreSQL username |
-| `DB_PASSWORD` | `postgres` | PostgreSQL password |
-| `POSTGRES_PORT` | `6766` | PostgreSQL host port in Docker Compose |
-| `POSTGRES_DB` | `user_service` | PostgreSQL database name |
-| `POSTGRES_USER` | `postgres` | PostgreSQL Docker user |
-| `POSTGRES_PASSWORD` | `postgres` | PostgreSQL Docker password |
-| `JWT_PRIVATE_KEY` | empty | RSA private key in PEM format |
-| `JWT_KEY_ID` | `user-service-rsa-1` | Public key id exposed in JWKS |
-| `JWT_ISSUER` | `study-platform-user-service` | JWT issuer |
-| `JWT_AUDIENCE` | `study-platform` | JWT audience |
-| `JWT_ACCESS_EXPIRATION_MINUTES` | `15` | Access token lifetime |
-| `JWT_REFRESH_EXPIRATION_DAYS` | `7` | Refresh token lifetime |
-| `JPA_DDL_AUTO` | `update` | Hibernate schema mode |
-| `JPA_SHOW_SQL` | `false` | SQL logging flag |
+| `SERVER_PORT` | `8081` | HTTP порт UserService |
+| `DB_URL` | `jdbc:postgresql://localhost:5432/user_service` | JDBC URL PostgreSQL |
+| `DB_USERNAME` | `postgres` | Имя пользователя PostgreSQL |
+| `DB_PASSWORD` | `postgres` | Пароль PostgreSQL |
+| `POSTGRES_PORT` | `5432` | Host-порт PostgreSQL в Docker Compose |
+| `POSTGRES_DB` | `user_service` | Имя базы данных PostgreSQL |
+| `POSTGRES_USER` | `postgres` | Пользователь PostgreSQL в Docker |
+| `POSTGRES_PASSWORD` | `postgres` | Пароль PostgreSQL в Docker |
+| `JWT_PRIVATE_KEY` | пусто | RSA private key в PEM формате |
+| `JWT_KEY_ID` | `user-service-rsa-1` | ID публичного ключа в JWKS |
+| `JWT_ISSUER` | `study-platform-user-service` | Issuer JWT |
+| `JWT_AUDIENCE` | `study-platform` | Audience JWT |
+| `JWT_ACCESS_EXPIRATION_MINUTES` | `15` | Время жизни access token |
+| `JWT_REFRESH_EXPIRATION_DAYS` | `7` | Время жизни refresh token |
+| `JPA_DDL_AUTO` | `update` | Режим Hibernate schema generation |
+| `JPA_SHOW_SQL` | `false` | Включение SQL логов |
 | `LOG_LEVEL_ROOT` | `INFO` | Root log level |
 
-## Local Run With Maven
+## Локальный запуск через Maven
 
-Start PostgreSQL first, then run:
+Сначала запустите PostgreSQL, затем выполните:
 
 ```bash
-mvn spring-boot:run
+./mvnw spring-boot:run
 ```
 
-The service will be available at:
+Сервис будет доступен по адресу:
 
 ```text
-http://localhost:8089
+http://localhost:8081
 ```
 
-## Local Run With Docker Compose
+## Локальный запуск через Docker Compose
 
-Start PostgreSQL and UserService:
+Запустить PostgreSQL и UserService:
 
 ```bash
 docker compose up --build
 ```
 
-PostgreSQL will be exposed on:
+PostgreSQL будет доступен на:
 
 ```text
-localhost:6766
+localhost:5432
 ```
 
-UserService will be exposed on:
+UserService будет доступен на:
 
 ```text
-localhost:8089
+localhost:8081
 ```
 
-## Run Tests
+## Тесты
 
-Tests use an isolated H2 database and do not require local PostgreSQL:
+Тесты используют изолированную H2 базу и не требуют локального PostgreSQL:
 
 ```bash
-mvn clean test
+./mvnw clean test
 ```
 
-## Coursework Notes
+## CI/CD
 
-This service demonstrates a microservice authentication model:
+Workflow GitHub Actions находится в:
 
-- only UserService owns the RSA private key
-- access tokens are signed with RS256
-- other services verify tokens through JWKS
-- refresh tokens are stored as SHA-256 hashes
-- protected endpoints use stateless Spring Security
-- OpenAPI documents the HTTP API contract
+```text
+.github/workflows/user-service-ci-cd.yml
+```
+
+Он запускается на `pull_request` в `main` и на `push` в `main`.
+
+Проверки CI:
+
+- сборка и тесты через Maven
+- проверка валидности `openapi.yml`
+- проверка, что OpenAPI файл не изменился во время сборки
+- Docker build
+
+Deploy на VPS запускается только при `push` в `main` после успешного CI.
+
+Для deploy нужны GitHub Secrets:
+
+```text
+VPS_HOST
+VPS_PORT
+VPS_USER
+VPS_SSH_KEY
+VPS_DEPLOY_PATH
+```
+
+Опционально можно добавить:
+
+```text
+VPS_HEALTHCHECK_URL
+```
+
+Если `VPS_HEALTHCHECK_URL` не задан, workflow проверит:
+
+```text
+http://127.0.0.1:8081/health
+```
+
+## Как проверить CI/CD
+
+1. Создайте Pull Request в `main`.
+2. Откройте вкладку `Actions` в GitHub.
+3. Убедитесь, что workflow `UserService CI/CD` завершился успешно.
+4. Проверьте шаги `Run tests`, `Validate OpenAPI contract` и `Build Docker image`.
+5. После merge в `main` проверьте deploy job.
+6. На VPS убедитесь, что рядом с проектом есть `.env`.
+7. Проверьте контейнеры командой:
+
+```bash
+docker compose ps
+```
+
+8. Проверьте доступность сервиса:
+
+```bash
+curl -fsS http://127.0.0.1:8081/health
+```
