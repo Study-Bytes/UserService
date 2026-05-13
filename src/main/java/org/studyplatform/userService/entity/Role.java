@@ -1,4 +1,4 @@
-package ru.example.userService.entity;
+package org.studyplatform.userService.entity;
 
 public enum Role {
     STUDENT,

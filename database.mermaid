@@ -1,0 +1,16 @@
+erDiagram
+    USERS ||--o{ REFRESH_TOKENS : "has"
+    USERS {
+        bigint id PK
+        string email UK "Уникальный логин"
+        string password "Хэшированный BCrypt пароль"
+        string full_name
+        string role "STUDENT, TEACHER, ADMIN"
+    }
+    REFRESH_TOKENS {
+        bigint id PK
+        string token_hash UK "SHA-256 хэш токена"
+        timestamp expires_at
+        boolean revoked "Статус отзыва"
+        bigint user_id FK "Связь с владельцем"
+    }
