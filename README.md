@@ -286,7 +286,8 @@ http://127.0.0.1:8081/health
 3. Убедитесь, что workflow `UserService CI/CD` завершился успешно.
 4. Проверьте шаги `Run tests`, `Validate OpenAPI contract` и `Build Docker image`.
 5. После merge в `main` проверьте deploy job.
-6. На VPS убедитесь, что в `$VPS_DEPLOY_BASE_PATH` есть `.env`.
+6. Workflow деплоит сервис в `$VPS_DEPLOY_BASE_PATH/user-service`.
+   При первом деплое он клонирует репозиторий и создает `.env` из `.env.example`, если `.env` еще нет.
 7. Проверьте контейнеры командой:
 
 ```bash
