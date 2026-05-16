@@ -89,4 +89,21 @@ class JwtAuthenticationFilterTest {
         verify(jwtUtil, never()).parseClaims("invalid-token");
         verify(filterChain).doFilter(request, response);
     }
+
+    @Test
+    void shouldNotFilter_ShouldSkipOnlyPublicAuthEndpoints() {
+        var filter = new JwtAuthenticationFilter(jwtUtil, userDetailsService);
+
+        assertEquals(true, filter.shouldNotFilter(request("/api/v1/auth/register")));
+        assertEquals(true, filter.shouldNotFilter(request("/api/v1/auth/login")));
+        assertEquals(true, filter.shouldNotFilter(request("/api/v1/auth/refresh")));
+        assertEquals(true, filter.shouldNotFilter(request("/api/v1/auth/.well-known/jwks.json")));
+        assertEquals(false, filter.shouldNotFilter(request("/api/v1/auth/logout")));
+    }
+
+    private MockHttpServletRequest request(String servletPath) {
+        var request = new MockHttpServletRequest();
+        request.setServletPath(servletPath);
+        return request;
+    }
 }

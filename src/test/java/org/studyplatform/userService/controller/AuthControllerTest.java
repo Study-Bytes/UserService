@@ -7,7 +7,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.authentication.TestingAuthenticationToken;
+import org.springframework.http.HttpHeaders;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
@@ -145,23 +145,23 @@ class AuthControllerTest {
     }
 
     @Test
-    void logout_WithAuthenticatedUser_ShouldReturnNoContent() throws Exception {
+    void logout_WithBearerHeader_ShouldReturnNoContent() throws Exception {
         mockMvc.perform(post("/api/v1/auth/logout")
-                        .principal(new TestingAuthenticationToken("user@example.com", null)))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer access-token"))
                 .andExpect(status().isNoContent());
 
-        verify(authService).logoutCurrentUser("user@example.com");
+        verify(authService).logoutByAccessToken("Bearer access-token");
     }
 
     @Test
-    void logout_WhenUserCannotBeResolved_ShouldReturnUnauthorized() throws Exception {
-        org.mockito.Mockito.doThrow(new InvalidTokenException("Refresh token not found"))
-                .when(authService).logoutCurrentUser("user@example.com");
+    void logout_WithInvalidBearerHeader_ShouldReturnUnauthorized() throws Exception {
+        org.mockito.Mockito.doThrow(new InvalidTokenException("Invalid or expired access token"))
+                .when(authService).logoutByAccessToken("Bearer invalid-token");
 
         mockMvc.perform(post("/api/v1/auth/logout")
-                        .principal(new TestingAuthenticationToken("user@example.com", null)))
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer invalid-token"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.message").value("Refresh token not found"));
+                .andExpect(jsonPath("$.message").value("Invalid or expired access token"));
     }
 
     private RegisterRequest registerRequest() {

@@ -1,5 +1,6 @@
 package org.studyplatform.userService.service;
 
+import io.jsonwebtoken.Claims;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -120,5 +121,25 @@ public class AuthService {
                 .orElseThrow(() -> new UserNotFoundException("User not found"));
         refreshTokenRepository.revokeAllByUser(user);
         log.info("User {} logged out, all refresh tokens revoked", user.getEmail());
+    }
+
+    @Transactional
+    public void logoutByAccessToken(String authorizationHeader) {
+        if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
+            throw new InvalidTokenException("Access token is required for logout");
+        }
+
+        String token = authorizationHeader.substring(7);
+        if (!jwtUtil.validateToken(token)) {
+            throw new InvalidTokenException("Invalid or expired access token");
+        }
+
+        Claims claims = jwtUtil.parseClaims(token);
+        String email = claims.get("email", String.class);
+        if (email == null || email.isBlank()) {
+            throw new InvalidTokenException("Access token email claim is required for logout");
+        }
+
+        logoutCurrentUser(email);
     }
 }

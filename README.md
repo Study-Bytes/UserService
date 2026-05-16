@@ -88,15 +88,18 @@ POST /api/v1/auth/logout
 GET  /api/v1/auth/.well-known/jwks.json
 ```
 
-`POST /api/v1/auth/register` регистрирует нового пользователя. По умолчанию новый пользователь получает роль `STUDENT`.
+`POST /api/v1/auth/register` регистрирует нового пользователя. Поле `role` опционально:
+если роль не передана, используется `STUDENT`; `STUDENT` и `TEACHER` разрешены для self-service регистрации;
+`ADMIN` через публичную регистрацию запрещен.
 
 Пример запроса:
 
 ```json
 {
+  "fullName": "Иван Иванов",
   "email": "user@example.com",
   "password": "securePassword123",
-  "fullName": "Иван Иванов"
+  "role": "STUDENT"
 }
 ```
 
@@ -106,6 +109,15 @@ GET  /api/v1/auth/.well-known/jwks.json
 
 ```json
 {
+  "user": {
+    "id": 2,
+    "email": "test2@mail.com",
+    "fullName": "Тест Тестов",
+    "role": "STUDENT",
+    "status": "ACTIVE",
+    "avatarUrl": null,
+    "bio": null
+  },
   "accessToken": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
   "refreshToken": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
   "tokenType": "Bearer",
@@ -115,7 +127,8 @@ GET  /api/v1/auth/.well-known/jwks.json
 
 `POST /api/v1/auth/refresh` принимает refresh token и выдает новый access token, если refresh token валиден, не истек, не отозван и найден в базе.
 
-`POST /api/v1/auth/logout` принимает refresh token и отзывает refresh tokens пользователя. Это разлогинивает пользователя на устройствах, где требуется refresh.
+`POST /api/v1/auth/logout` требует заголовок `Authorization: Bearer <access-token>` и отзывает все refresh tokens текущего пользователя.
+Body не требуется. Успешный ответ: `204 No Content`.
 
 `GET /api/v1/auth/.well-known/jwks.json` возвращает публичный JWKS для проверки JWT другими сервисами.
 
@@ -131,6 +144,8 @@ Endpoints:
 
 ```text
 GET /api/v1/users/me
+PUT /api/v1/users/me/profile
+PUT /api/v1/users/me/password
 GET /api/v1/users/{id}
 ```
 
@@ -142,6 +157,29 @@ Authorization: Bearer <access-token>
 
 `GET /api/v1/users/{id}` возвращает пользователя по ID. Endpoint доступен только пользователю с ролью `ADMIN`.
 
+`PUT /api/v1/users/me/profile` обновляет профиль текущего пользователя.
+
+Пример запроса:
+
+```json
+{
+  "fullName": "Иван Иванов",
+  "avatarUrl": "https://example.com/avatar.png",
+  "bio": "Java student"
+}
+```
+
+`PUT /api/v1/users/me/password` меняет пароль текущего пользователя.
+
+Пример запроса:
+
+```json
+{
+  "currentPassword": "securePassword123",
+  "newPassword": "newSecurePassword123"
+}
+```
+
 Пример ответа профиля:
 
 ```json
@@ -149,7 +187,10 @@ Authorization: Bearer <access-token>
   "id": 2,
   "email": "test2@mail.com",
   "fullName": "Тест Тестов",
-  "role": "STUDENT"
+  "role": "STUDENT",
+  "status": "ACTIVE",
+  "avatarUrl": null,
+  "bio": null
 }
 ```
 
@@ -179,8 +220,14 @@ UserService разделяет публичные и защищенные endpoi
 /health                              -> public
 /swagger-ui.html, /swagger-ui/**     -> public в текущей конфигурации
 /v3/api-docs/**                      -> public в текущей конфигурации
-/api/v1/auth/**                      -> public
+/api/v1/auth/register                -> public
+/api/v1/auth/login                   -> public
+/api/v1/auth/refresh                 -> public
+/api/v1/auth/.well-known/jwks.json   -> public
+/api/v1/auth/logout                  -> app-level Bearer access token validation
 /api/v1/users/me                     -> Bearer JWT
+/api/v1/users/me/profile             -> Bearer JWT
+/api/v1/users/me/password            -> Bearer JWT
 /api/v1/users/{id}                   -> Bearer JWT + ADMIN
 ```
 
@@ -401,7 +448,7 @@ curl -fsS http://127.0.0.1:8081/health
 ```bash
 curl -X POST http://localhost:8081/api/v1/auth/register \
   -H 'Content-Type: application/json' \
-  -d '{"email":"user@example.com","password":"securePassword123","fullName":"Иван Иванов"}'
+  -d '{"fullName":"Иван Иванов","email":"user@example.com","password":"securePassword123","role":"STUDENT"}'
 ```
 
 Логин:
@@ -418,6 +465,35 @@ curl -X POST http://localhost:8081/api/v1/auth/login \
 curl http://localhost:8081/api/v1/users/me \
   -H "Authorization: Bearer <access-token>"
 ```
+
+Обновление профиля:
+
+```bash
+curl -X PUT http://localhost:8081/api/v1/users/me/profile \
+  -H "Authorization: Bearer <access-token>" \
+  -H 'Content-Type: application/json' \
+  -d '{"fullName":"Иван Обновленный","avatarUrl":"https://example.com/avatar.png","bio":"Java student"}'
+```
+
+Смена пароля:
+
+```bash
+curl -X PUT http://localhost:8081/api/v1/users/me/password \
+  -H "Authorization: Bearer <access-token>" \
+  -H 'Content-Type: application/json' \
+  -d '{"currentPassword":"securePassword123","newPassword":"newSecurePassword123"}'
+```
+
+Logout:
+
+```bash
+curl -X POST http://localhost:8081/api/v1/auth/logout \
+  -H "Authorization: Bearer <access-token>" \
+  -i
+```
+
+Ожидаемый результат: `204 No Content`. Logout вручную проверяет `Authorization: Bearer <access-token>` в контроллере,
+поэтому при пустом, refresh или истекшем token должен вернуться `401` с JSON-ошибкой, а не пустой `403`.
 
 JWKS:
 

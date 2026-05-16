@@ -1,5 +1,6 @@
 package org.studyplatform.userService.service;
 
+import io.jsonwebtoken.impl.DefaultClaims;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -19,6 +20,7 @@ import org.studyplatform.userService.repository.UserRepository;
 import org.studyplatform.userService.security.JwtUtil;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -160,6 +162,24 @@ class AuthServiceTest {
         authService.logoutCurrentUser("student@test.com");
 
         verify(refreshTokenRepository).revokeAllByUser(user);
+    }
+
+    @Test
+    void logoutByAccessToken_ShouldValidateTokenAndRevokeUserTokens() {
+        User user = user(7L, "student@test.com", Role.STUDENT);
+        when(jwtUtil.validateToken("access-token")).thenReturn(true);
+        when(jwtUtil.parseClaims("access-token"))
+                .thenReturn(new DefaultClaims(Map.of("email", "student@test.com")));
+        when(userRepository.findByEmail("student@test.com")).thenReturn(Optional.of(user));
+
+        authService.logoutByAccessToken("Bearer access-token");
+
+        verify(refreshTokenRepository).revokeAllByUser(user);
+    }
+
+    @Test
+    void logoutByAccessToken_ShouldRejectMissingBearerHeader() {
+        assertThrows(InvalidTokenException.class, () -> authService.logoutByAccessToken(null));
     }
 
     private RefreshRequest refreshRequest(String token) {
