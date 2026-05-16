@@ -164,6 +164,16 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.message").value("Invalid or expired access token"));
     }
 
+    @Test
+    void logout_WithoutBearerHeader_ShouldReturnUnauthorized() throws Exception {
+        org.mockito.Mockito.doThrow(new InvalidTokenException("Access token is required for logout"))
+                .when(authService).logoutByAccessToken(null);
+
+        mockMvc.perform(post("/api/v1/auth/logout"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message").value("Access token is required for logout"));
+    }
+
     private RegisterRequest registerRequest() {
         var request = new RegisterRequest();
         request.setEmail("user@example.com");

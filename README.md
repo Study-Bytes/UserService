@@ -492,8 +492,9 @@ curl -X POST http://localhost:8081/api/v1/auth/logout \
   -i
 ```
 
-Ожидаемый результат: `204 No Content`. Logout вручную проверяет `Authorization: Bearer <access-token>` в контроллере,
-поэтому при пустом, refresh или истекшем token должен вернуться `401` с JSON-ошибкой, а не пустой `403`.
+Ожидаемый результат: `204 No Content`. Logout не проходит через JWT-фильтр Spring Security: endpoint открыт на уровне
+security-chain, а `Authorization: Bearer <access-token>` проверяется вручную в контроллере. Поэтому при пустом, refresh
+или истекшем token должен вернуться `401` с JSON-ошибкой, а не пустой `403`.
 
 JWKS:
 
