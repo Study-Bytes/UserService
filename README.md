@@ -301,7 +301,8 @@ git diff --exit-code openapi.yml
 | `POSTGRES_DB` | `user_service` | Имя базы PostgreSQL в Docker Compose |
 | `POSTGRES_USER` | `postgres` | Пользователь PostgreSQL в Docker Compose |
 | `POSTGRES_PASSWORD` | `postgres` | Пароль PostgreSQL в Docker Compose |
-| `POSTGRES_PORT` | `5432` | Host-порт PostgreSQL |
+| `USER_BACKEND_NETWORK` | `studybytes_backend_net` | Общая Docker network для Nginx/BFF/микросервисов |
+| `USER_DB_NETWORK` | `user_db_net` | Внутренняя Docker network для UserService и PostgreSQL |
 | `JWT_PRIVATE_KEY` | пусто | RSA private key в PEM формате |
 | `JWT_KEY_ID` | `user-service-rsa-1` | `kid` публичного ключа в JWKS |
 | `JWT_ISSUER` | `study-platform-user-service` | JWT issuer |
@@ -358,19 +359,20 @@ cp .env.example .env
 Запустить PostgreSQL и UserService через Docker Compose:
 
 ```bash
+docker network create studybytes_backend_net
 docker compose up --build
 ```
 
 UserService будет доступен:
 
 ```text
-http://localhost:8081
+http://127.0.0.1:8081
 ```
 
-PostgreSQL будет доступен:
+PostgreSQL не публикуется наружу на host-порт. Он доступен только внутри Docker Compose:
 
 ```text
-localhost:5432
+jdbc:postgresql://postgres:5432/user_service
 ```
 
 Запуск приложения через Maven требует запущенный PostgreSQL:
@@ -442,7 +444,9 @@ CI запускает:
 
 - `user-service`;
 - `postgres`;
-- volume `postgres-data`.
+- volume `user_postgres_data`;
+- external network `studybytes_backend_net`;
+- internal network `user_db_net`.
 
 UserService получает переменные из `.env`:
 
@@ -456,6 +460,21 @@ env_file:
 ```text
 jdbc:postgresql://postgres:5432/user_service
 ```
+
+UserService публикуется только на localhost хоста:
+
+```yaml
+ports:
+  - "127.0.0.1:${SERVER_PORT:-8081}:8081"
+```
+
+Это нужно, чтобы VPS Nginx мог безопасно проксировать запросы:
+
+```text
+https://study-byte.ru/user-service/api/v1/auth/.well-known/jwks.json
+```
+
+PostgreSQL находится только во внутренней Docker network и не открыт напрямую в интернет.
 
 Локальный reset базы с потерей данных:
 
