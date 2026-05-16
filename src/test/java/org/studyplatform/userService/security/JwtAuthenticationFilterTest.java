@@ -97,8 +97,9 @@ class JwtAuthenticationFilterTest {
         assertEquals(true, filter.shouldNotFilter(request("/api/v1/auth/register")));
         assertEquals(true, filter.shouldNotFilter(request("/api/v1/auth/login")));
         assertEquals(true, filter.shouldNotFilter(request("/api/v1/auth/refresh")));
+        assertEquals(true, filter.shouldNotFilter(request("/api/v1/auth/logout")));
         assertEquals(true, filter.shouldNotFilter(request("/api/v1/auth/.well-known/jwks.json")));
-        assertEquals(false, filter.shouldNotFilter(request("/api/v1/auth/logout")));
+        assertEquals(false, filter.shouldNotFilter(request("/api/v1/users/me")));
     }
 
     private MockHttpServletRequest request(String servletPath) {
