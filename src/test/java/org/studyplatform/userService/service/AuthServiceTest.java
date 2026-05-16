@@ -63,6 +63,8 @@ class AuthServiceTest {
         AuthResponse response = authService.login(request);
 
         assertNotNull(response);
+        assertEquals(1L, response.getUser().getId());
+        assertEquals("student@test.com", response.getUser().getEmail());
         assertEquals("access-token", response.getAccessToken());
         assertEquals("refresh-token", response.getRefreshToken());
         assertEquals("Bearer", response.getTokenType());
@@ -73,7 +75,7 @@ class AuthServiceTest {
     }
 
     @Test
-    void refreshAccessToken_ShouldReturnNewAccessToken() {
+    void refreshAccessToken_ShouldReturnAuthResponse() {
         RefreshRequest request = refreshRequest("refresh-token");
         User user = user(2L, "teacher@test.com", Role.TEACHER);
         RefreshToken storedToken = new RefreshToken("refresh-token-hash", user, Instant.now().plusSeconds(3600));
@@ -82,10 +84,15 @@ class AuthServiceTest {
         when(jwtUtil.hashToken("refresh-token")).thenReturn("refresh-token-hash");
         when(refreshTokenRepository.findByTokenHash("refresh-token-hash")).thenReturn(Optional.of(storedToken));
         when(jwtUtil.generateAccessToken(user)).thenReturn("new-access-token");
+        when(jwtUtil.getAccessExpirationSeconds()).thenReturn(900L);
 
-        String result = authService.refreshAccessToken(request);
+        AuthResponse result = authService.refreshAccessToken(request);
 
-        assertEquals("new-access-token", result);
+        assertEquals("new-access-token", result.getAccessToken());
+        assertEquals("refresh-token", result.getRefreshToken());
+        assertEquals("Bearer", result.getTokenType());
+        assertEquals(900L, result.getExpiresIn());
+        assertEquals(2L, result.getUser().getId());
     }
 
     @Test
@@ -143,6 +150,16 @@ class AuthServiceTest {
     @Test
     void logout_ShouldRejectBlankToken() {
         assertThrows(InvalidTokenException.class, () -> authService.logout(" "));
+    }
+
+    @Test
+    void logoutCurrentUser_ShouldRevokeAllTokensForAuthenticatedUser() {
+        User user = user(6L, "student@test.com", Role.STUDENT);
+        when(userRepository.findByEmail("student@test.com")).thenReturn(Optional.of(user));
+
+        authService.logoutCurrentUser("student@test.com");
+
+        verify(refreshTokenRepository).revokeAllByUser(user);
     }
 
     private RefreshRequest refreshRequest(String token) {

@@ -1,5 +1,6 @@
 package org.studyplatform.userService.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -9,6 +10,9 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
+import org.studyplatform.userService.dto.ChangePasswordRequest;
+import org.studyplatform.userService.dto.UpdateProfileRequest;
 import org.studyplatform.userService.entity.Role;
 import org.studyplatform.userService.entity.User;
 import org.studyplatform.userService.exception.UserNotFoundException;
@@ -18,11 +22,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @ExtendWith(MockitoExtension.class)
 class UserControllerTest {
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
     @Mock
     private UserService userService;
 
@@ -30,8 +37,12 @@ class UserControllerTest {
 
     @BeforeEach
     void setUp() {
+        var validator = new LocalValidatorFactoryBean();
+        validator.afterPropertiesSet();
+
         mockMvc = MockMvcBuilders.standaloneSetup(new UserController(userService))
                 .setControllerAdvice(new RestExceptionHandler())
+                .setValidator(validator)
                 .build();
     }
 
@@ -50,7 +61,48 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.id").value(1))
                 .andExpect(jsonPath("$.email").value("student@example.com"))
                 .andExpect(jsonPath("$.fullName").value("Student User"))
-                .andExpect(jsonPath("$.role").value("STUDENT"));
+                .andExpect(jsonPath("$.role").value("STUDENT"))
+                .andExpect(jsonPath("$.status").value("ACTIVE"));
+    }
+
+    @Test
+    void updateProfile_WhenAuthenticated_ShouldReturnUpdatedCurrentUser() throws Exception {
+        UpdateProfileRequest request = new UpdateProfileRequest();
+        request.setFullName("Updated User");
+        request.setAvatarUrl("https://example.com/avatar.png");
+        request.setBio("Java student");
+
+        User updatedUser = user(1L, "student@example.com", "Updated User", Role.STUDENT);
+        updatedUser.setAvatarUrl("https://example.com/avatar.png");
+        updatedUser.setBio("Java student");
+        when(userService.updateProfile(org.mockito.Mockito.eq("student@example.com"), org.mockito.Mockito.any(UpdateProfileRequest.class)))
+                .thenReturn(updatedUser);
+
+        mockMvc.perform(put("/api/v1/users/me/profile")
+                        .principal(new TestingAuthenticationToken("student@example.com", null))
+                        .contentType("application/json")
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.fullName").value("Updated User"))
+                .andExpect(jsonPath("$.avatarUrl").value("https://example.com/avatar.png"))
+                .andExpect(jsonPath("$.bio").value("Java student"));
+    }
+
+    @Test
+    void changePassword_WhenAuthenticated_ShouldReturnNoContent() throws Exception {
+        ChangePasswordRequest request = new ChangePasswordRequest();
+        request.setCurrentPassword("old-password");
+        request.setNewPassword("new-password");
+
+        mockMvc.perform(put("/api/v1/users/me/password")
+                        .principal(new TestingAuthenticationToken("student@example.com", null))
+                        .contentType("application/json")
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNoContent());
+
+        org.mockito.Mockito.verify(userService)
+                .changePassword(org.mockito.Mockito.eq("student@example.com"), org.mockito.Mockito.any(ChangePasswordRequest.class));
     }
 
     @Test
@@ -68,7 +120,8 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.id").value(2))
                 .andExpect(jsonPath("$.email").value("teacher@example.com"))
                 .andExpect(jsonPath("$.fullName").value("Teacher User"))
-                .andExpect(jsonPath("$.role").value("TEACHER"));
+                .andExpect(jsonPath("$.role").value("TEACHER"))
+                .andExpect(jsonPath("$.status").value("ACTIVE"));
     }
 
     @Test

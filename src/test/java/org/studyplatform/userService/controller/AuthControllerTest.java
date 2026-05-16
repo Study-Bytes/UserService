@@ -7,10 +7,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 import org.studyplatform.userService.dto.AuthResponse;
+import org.studyplatform.userService.dto.CurrentUser;
 import org.studyplatform.userService.dto.LoginRequest;
 import org.studyplatform.userService.dto.RefreshRequest;
 import org.studyplatform.userService.dto.RegisterRequest;
@@ -22,8 +24,8 @@ import org.studyplatform.userService.service.UserService;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -52,17 +54,23 @@ class AuthControllerTest {
     }
 
     @Test
-    void register_WithValidRequest_ShouldReturnCreatedMessage() throws Exception {
+    void register_WithValidRequest_ShouldReturnAuthResponse() throws Exception {
         var savedUser = new User("user@example.com", "encoded-password", Role.STUDENT, "User Name");
         savedUser.setId(10L);
         when(userService.register(any(RegisterRequest.class))).thenReturn(savedUser);
+        when(authService.issueTokenPair(savedUser)).thenReturn(authResponse(savedUser));
 
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType("application/json")
                         .content(objectMapper.writeValueAsString(registerRequest())))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.message").value("User registered successfully"))
-                .andExpect(jsonPath("$.userId").value(10));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.user.id").value(10))
+                .andExpect(jsonPath("$.user.email").value("user@example.com"))
+                .andExpect(jsonPath("$.user.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.accessToken").value("access-token"))
+                .andExpect(jsonPath("$.refreshToken").value("refresh-token"))
+                .andExpect(jsonPath("$.tokenType").value("Bearer"))
+                .andExpect(jsonPath("$.expiresIn").value(900));
     }
 
     @Test
@@ -80,13 +88,16 @@ class AuthControllerTest {
 
     @Test
     void login_WithValidCredentials_ShouldReturnAuthResponse() throws Exception {
-        var response = new AuthResponse("access-token", "refresh-token", "Bearer", 900L);
+        var user = new User("user@example.com", "encoded-password", Role.STUDENT, "User Name");
+        user.setId(1L);
+        var response = authResponse(user);
         when(authService.login(any(LoginRequest.class))).thenReturn(response);
 
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType("application/json")
                         .content(objectMapper.writeValueAsString(loginRequest())))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.user.email").value("user@example.com"))
                 .andExpect(jsonPath("$.accessToken").value("access-token"))
                 .andExpect(jsonPath("$.refreshToken").value("refresh-token"))
                 .andExpect(jsonPath("$.tokenType").value("Bearer"))
@@ -105,15 +116,19 @@ class AuthControllerTest {
     }
 
     @Test
-    void refresh_WithValidToken_ShouldReturnAccessToken() throws Exception {
-        when(authService.refreshAccessToken(any(RefreshRequest.class))).thenReturn("new-access-token");
+    void refresh_WithValidToken_ShouldReturnAuthResponse() throws Exception {
+        var user = new User("user@example.com", "encoded-password", Role.STUDENT, "User Name");
+        user.setId(1L);
+        var response = new AuthResponse(CurrentUser.from(user), "new-access-token", "refresh-token", "Bearer", 900L);
+        when(authService.refreshAccessToken(any(RefreshRequest.class))).thenReturn(response);
 
         mockMvc.perform(post("/api/v1/auth/refresh")
                         .contentType("application/json")
                         .content(objectMapper.writeValueAsString(refreshRequest())))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.message").value("Access token refreshed successfully"))
+                .andExpect(jsonPath("$.user.id").value(1))
                 .andExpect(jsonPath("$.accessToken").value("new-access-token"))
+                .andExpect(jsonPath("$.refreshToken").value("refresh-token"))
                 .andExpect(jsonPath("$.tokenType").value("Bearer"));
     }
 
@@ -130,22 +145,21 @@ class AuthControllerTest {
     }
 
     @Test
-    void logout_WithValidToken_ShouldReturnSuccessMessage() throws Exception {
+    void logout_WithAuthenticatedUser_ShouldReturnNoContent() throws Exception {
         mockMvc.perform(post("/api/v1/auth/logout")
-                        .contentType("application/json")
-                        .content(objectMapper.writeValueAsString(refreshRequest())))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.message").value("Logged out successfully"));
+                        .principal(new TestingAuthenticationToken("user@example.com", null)))
+                .andExpect(status().isNoContent());
+
+        verify(authService).logoutCurrentUser("user@example.com");
     }
 
     @Test
-    void logout_WithInvalidToken_ShouldReturnUnauthorized() throws Exception {
-        doThrow(new InvalidTokenException("Refresh token not found"))
-                .when(authService).logout("refresh-token");
+    void logout_WhenUserCannotBeResolved_ShouldReturnUnauthorized() throws Exception {
+        org.mockito.Mockito.doThrow(new InvalidTokenException("Refresh token not found"))
+                .when(authService).logoutCurrentUser("user@example.com");
 
         mockMvc.perform(post("/api/v1/auth/logout")
-                        .contentType("application/json")
-                        .content(objectMapper.writeValueAsString(refreshRequest())))
+                        .principal(new TestingAuthenticationToken("user@example.com", null)))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.message").value("Refresh token not found"));
     }
@@ -155,6 +169,7 @@ class AuthControllerTest {
         request.setEmail("user@example.com");
         request.setPassword("strong-password");
         request.setFullName("User Name");
+        request.setRole(Role.STUDENT);
         return request;
     }
 
@@ -169,5 +184,9 @@ class AuthControllerTest {
         var request = new RefreshRequest();
         request.setRefreshToken("refresh-token");
         return request;
+    }
+
+    private AuthResponse authResponse(User user) {
+        return new AuthResponse(CurrentUser.from(user), "access-token", "refresh-token", "Bearer", 900L);
     }
 }

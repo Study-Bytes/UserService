@@ -1,8 +1,8 @@
 package org.studyplatform.userService.controller;
 
 import jakarta.validation.Valid;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -14,8 +14,6 @@ import org.studyplatform.userService.dto.RegisterRequest;
 import org.studyplatform.userService.entity.User;
 import org.studyplatform.userService.service.AuthService;
 import org.studyplatform.userService.service.UserService;
-
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -29,13 +27,9 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<Map<String, Object>> register(@Valid @RequestBody RegisterRequest request) {
+    public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
         User savedUser = userService.register(request);
-
-        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
-                "message", "User registered successfully",
-                "userId", savedUser.getId()
-        ));
+        return ResponseEntity.ok(authService.issueTokenPair(savedUser));
     }
 
     @PostMapping("/login")
@@ -44,20 +38,13 @@ public class AuthController {
     }
 
     @PostMapping("/refresh")
-    public ResponseEntity<Map<String, String>> refresh(@Valid @RequestBody RefreshRequest request) {
-        String accessToken = authService.refreshAccessToken(request);
-
-        return ResponseEntity.ok(Map.of(
-                "message", "Access token refreshed successfully",
-                "accessToken", accessToken,
-                "tokenType", "Bearer"
-        ));
+    public ResponseEntity<AuthResponse> refresh(@Valid @RequestBody RefreshRequest request) {
+        return ResponseEntity.ok(authService.refreshAccessToken(request));
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<Map<String, String>> logout(@Valid @RequestBody RefreshRequest request) {
-        authService.logout(request.getRefreshToken());
-
-        return ResponseEntity.ok(Map.of("message", "Logged out successfully"));
+    public ResponseEntity<Void> logout(Authentication authentication) {
+        authService.logoutCurrentUser(authentication.getName());
+        return ResponseEntity.noContent().build();
     }
 }

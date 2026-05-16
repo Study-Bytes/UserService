@@ -1,12 +1,18 @@
 package org.studyplatform.userService.controller;
 
+import jakarta.validation.Valid;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.studyplatform.userService.dto.UserDto;
+import org.studyplatform.userService.dto.ChangePasswordRequest;
+import org.studyplatform.userService.dto.CurrentUser;
+import org.studyplatform.userService.dto.UpdateProfileRequest;
 import org.studyplatform.userService.entity.User;
 import org.studyplatform.userService.service.UserService;
 
@@ -20,24 +26,33 @@ public class UserController {
     }
 
     @GetMapping("/me")
-    public UserDto me(Authentication authentication) {
+    public CurrentUser me(Authentication authentication) {
         User user = userService.findByEmail(authentication.getName());
-        return toDto(user);
+        return CurrentUser.from(user);
+    }
+
+    @PutMapping("/me/profile")
+    public CurrentUser updateProfile(
+            Authentication authentication,
+            @Valid @RequestBody UpdateProfileRequest request
+    ) {
+        User user = userService.updateProfile(authentication.getName(), request);
+        return CurrentUser.from(user);
+    }
+
+    @PutMapping("/me/password")
+    public ResponseEntity<Void> changePassword(
+            Authentication authentication,
+            @Valid @RequestBody ChangePasswordRequest request
+    ) {
+        userService.changePassword(authentication.getName(), request);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public UserDto getById(@PathVariable Long id) {
+    public CurrentUser getById(@PathVariable Long id) {
         User user = userService.findById(id);
-        return toDto(user);
-    }
-
-    private UserDto toDto(User user) {
-        return new UserDto(
-                user.getId(),
-                user.getEmail(),
-                user.getFullName(),
-                user.getRole().name()
-        );
+        return CurrentUser.from(user);
     }
 }

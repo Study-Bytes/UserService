@@ -3,6 +3,7 @@ package org.studyplatform.userService.dto;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import org.studyplatform.userService.entity.Role;
 
 // DTO для регистрации
 public class RegisterRequest {
@@ -14,7 +15,10 @@ public class RegisterRequest {
     @Size(min = 8)
     private String password;
 
-    private String fullName; // опционально
+    @NotBlank
+    private String fullName;
+
+    private Role role;
 
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }
@@ -22,5 +26,6 @@ public class RegisterRequest {
     public void setPassword(String password) { this.password = password; }
     public String getFullName() { return fullName; }
     public void setFullName(String fullName) { this.fullName = fullName; }
+    public Role getRole() { return role; }
+    public void setRole(Role role) { this.role = role; }
 }
-
