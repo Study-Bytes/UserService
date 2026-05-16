@@ -224,7 +224,7 @@ UserService разделяет публичные и защищенные endpoi
 /api/v1/auth/login                   -> public
 /api/v1/auth/refresh                 -> public
 /api/v1/auth/.well-known/jwks.json   -> public
-/api/v1/auth/logout                  -> Bearer JWT
+/api/v1/auth/logout                  -> app-level Bearer access token validation
 /api/v1/users/me                     -> Bearer JWT
 /api/v1/users/me/profile             -> Bearer JWT
 /api/v1/users/me/password            -> Bearer JWT
@@ -492,7 +492,8 @@ curl -X POST http://localhost:8081/api/v1/auth/logout \
   -i
 ```
 
-Ожидаемый результат: `204 No Content`. Если logout возвращает `403`, проверьте, что отправляется именно access token в заголовке `Authorization`, а не refresh token и не пустой Bearer.
+Ожидаемый результат: `204 No Content`. Logout вручную проверяет `Authorization: Bearer <access-token>` в контроллере,
+поэтому при пустом, refresh или истекшем token должен вернуться `401` с JSON-ошибкой, а не пустой `403`.
 
 JWKS:
 

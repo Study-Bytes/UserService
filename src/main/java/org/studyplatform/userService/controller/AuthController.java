@@ -1,11 +1,13 @@
 package org.studyplatform.userService.controller;
 
 import jakarta.validation.Valid;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 import org.studyplatform.userService.dto.AuthResponse;
 import org.studyplatform.userService.dto.LoginRequest;
@@ -43,8 +45,15 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(Authentication authentication) {
-        authService.logoutCurrentUser(authentication.getName());
+    public ResponseEntity<Void> logout(
+            Authentication authentication,
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorizationHeader
+    ) {
+        if (authentication != null && authentication.isAuthenticated()) {
+            authService.logoutCurrentUser(authentication.getName());
+        } else {
+            authService.logoutByAccessToken(authorizationHeader);
+        }
         return ResponseEntity.noContent().build();
     }
 }
