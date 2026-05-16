@@ -100,18 +100,21 @@ docker compose up -d --build
 | 2 | Docker Compose config | Выполнить `docker compose config` | Compose файл валиден |
 | 3 | Запуск сервиса | Выполнить `docker compose up -d --build` | Контейнеры запущены, PostgreSQL healthy |
 | 4 | Health endpoint | `GET /health` | HTTP 200, `status = UP` |
-| 5 | Регистрация пользователя | `POST /api/v1/auth/register` с валидным email и password | Пользователь создан, возвращено сообщение об успехе |
+| 5 | Регистрация пользователя | `POST /api/v1/auth/register` с `fullName`, валидным email, password и ролью `STUDENT` или `TEACHER` | Возвращены `user`, `accessToken`, `refreshToken`, `tokenType`, `expiresIn` |
 | 6 | Дублирующий email | Повторить регистрацию с тем же email | HTTP 409 Conflict |
-| 7 | Login | `POST /api/v1/auth/login` с корректными учетными данными | Возвращены `accessToken`, `refreshToken`, `tokenType`, `expiresIn` |
+| 7 | Login | `POST /api/v1/auth/login` с корректными учетными данными | Возвращены `user`, `accessToken`, `refreshToken`, `tokenType`, `expiresIn` |
 | 8 | Bad credentials | `POST /api/v1/auth/login` с неверным паролем | HTTP 401 Unauthorized |
-| 9 | Refresh access token | `POST /api/v1/auth/refresh` с валидным refresh token | Возвращен новый `accessToken` |
-| 10 | Logout | `POST /api/v1/auth/logout` с refresh token | Refresh tokens пользователя отозваны |
+| 9 | Refresh access token | `POST /api/v1/auth/refresh` с валидным refresh token в body | Возвращен новый `accessToken` и данные `user` |
+| 10 | Logout | `POST /api/v1/auth/logout` с `Authorization: Bearer <access-token>` без body | HTTP 204, refresh tokens пользователя отозваны |
 | 11 | Профиль без JWT | `GET /api/v1/users/me` без Authorization header | HTTP 401 Unauthorized |
-| 12 | Профиль с JWT | `GET /api/v1/users/me` с `Authorization: Bearer token` | Возвращен `UserDto` текущего пользователя |
+| 12 | Профиль с JWT | `GET /api/v1/users/me` с `Authorization: Bearer token` | Возвращен `CurrentUser` текущего пользователя |
 | 13 | Admin endpoint без `ADMIN` | `GET /api/v1/users/{id}` пользователем `STUDENT` | HTTP 403 Forbidden |
 | 14 | JWKS endpoint | `GET /api/v1/auth/.well-known/jwks.json` | HTTP 200, есть `kty`, `use`, `kid`, `alg`, `n`, `e` |
 | 15 | Отсутствие private key в JWKS | Проверить JSON JWKS | Нет полей `d`, `p`, `q`, `JWT_PRIVATE_KEY` |
 | 16 | Swagger UI | Открыть `/swagger-ui/index.html` | Swagger UI доступен |
+| 17 | Обновление профиля | `PUT /api/v1/users/me/profile` с Bearer token и body `fullName`, `avatarUrl`, `bio` | Возвращен обновленный `CurrentUser` |
+| 18 | Смена пароля | `PUT /api/v1/users/me/password` с Bearer token и body `currentPassword`, `newPassword` | HTTP 204 |
+| 19 | Запрет ADMIN регистрации | `POST /api/v1/auth/register` с `role = ADMIN` | HTTP 400 Bad Request |
 
 ## 9. Проверка JWT/JWKS
 
