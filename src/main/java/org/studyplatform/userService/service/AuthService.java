@@ -7,11 +7,13 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.studyplatform.userService.dto.AuthResponse;
+import org.studyplatform.userService.dto.CurrentUser;
 import org.studyplatform.userService.dto.LoginRequest;
 import org.studyplatform.userService.dto.RefreshRequest;
 import org.studyplatform.userService.entity.RefreshToken;
 import org.studyplatform.userService.entity.User;
 import org.studyplatform.userService.exception.InvalidTokenException;
+import org.studyplatform.userService.exception.UserNotFoundException;
 import org.studyplatform.userService.repository.RefreshTokenRepository;
 import org.studyplatform.userService.repository.UserRepository;
 import org.studyplatform.userService.security.JwtUtil;
@@ -42,6 +44,13 @@ public class AuthService {
         );
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new IllegalArgumentException("User not found after auth"));
+        AuthResponse response = issueTokenPair(user);
+        log.info("User {} logged in, issued tokens", user.getEmail());
+        return response;
+    }
+
+    @Transactional
+    public AuthResponse issueTokenPair(User user) {
         refreshTokenRepository.revokeAllByUser(user);
         String accessToken = jwtUtil.generateAccessToken(user);
         String refreshTokenRaw = jwtUtil.generateRefreshToken(user.getEmail(), user.getId());
@@ -50,12 +59,17 @@ public class AuthService {
         RefreshToken refreshToken = new RefreshToken(jwtUtil.hashToken(refreshTokenRaw), user, expiresAt);
         refreshTokenRepository.save(refreshToken);
 
-        log.info("User {} logged in, issued tokens", user.getEmail());
-        return new AuthResponse(accessToken, refreshTokenRaw, "Bearer", jwtUtil.getAccessExpirationSeconds());
+        return new AuthResponse(
+                CurrentUser.from(user),
+                accessToken,
+                refreshTokenRaw,
+                "Bearer",
+                jwtUtil.getAccessExpirationSeconds()
+        );
     }
 
     @Transactional
-    public String refreshAccessToken(RefreshRequest request) {
+    public AuthResponse refreshAccessToken(RefreshRequest request) {
         String rawToken = request.getRefreshToken();
         if (!jwtUtil.validateToken(rawToken)) {
             log.warn("Refresh token JWT validation failed");
@@ -79,7 +93,13 @@ public class AuthService {
         User user = storedToken.getUser();
         String newAccessToken = jwtUtil.generateAccessToken(user);
         log.info("Issued new access token for userId={}", user.getId());
-        return newAccessToken;
+        return new AuthResponse(
+                CurrentUser.from(user),
+                newAccessToken,
+                rawToken,
+                "Bearer",
+                jwtUtil.getAccessExpirationSeconds()
+        );
     }
 
     @Transactional
@@ -92,5 +112,13 @@ public class AuthService {
                 .orElseThrow(() -> new InvalidTokenException("Refresh token not found"));
         refreshTokenRepository.revokeAllByUser(storedToken.getUser());
         log.info("User {} logged out, all refresh tokens revoked", storedToken.getUser().getEmail());
+    }
+
+    @Transactional
+    public void logoutCurrentUser(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+        refreshTokenRepository.revokeAllByUser(user);
+        log.info("User {} logged out, all refresh tokens revoked", user.getEmail());
     }
 }

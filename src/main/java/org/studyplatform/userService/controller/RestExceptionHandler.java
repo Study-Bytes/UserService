@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.studyplatform.userService.exception.EmailAlreadyTakenException;
 import org.studyplatform.userService.exception.InvalidTokenException;
+import org.studyplatform.userService.exception.InvalidUserRoleException;
 import org.studyplatform.userService.exception.UserNotFoundException;
 
 import java.time.Instant;
@@ -44,6 +45,12 @@ public class RestExceptionHandler {
                 .orElse("Validation failed");
         log.warn("Validation error: {}", message);
         return buildError(HttpStatus.BAD_REQUEST, message);
+    }
+
+    @ExceptionHandler(InvalidUserRoleException.class)
+    public ResponseEntity<?> handleInvalidUserRole(InvalidUserRoleException e) {
+        log.warn("Invalid registration role: {}", e.getMessage());
+        return buildError(HttpStatus.BAD_REQUEST, e.getMessage());
     }
 
     // 401 — невалидный или отозванный токен
