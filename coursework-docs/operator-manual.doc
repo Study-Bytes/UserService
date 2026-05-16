@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Руководство оператора UserService</title>
+  <style>
+    body { font-family: "Times New Roman", serif; font-size: 14pt; line-height: 1.35; }
+    h1 { text-align: center; font-size: 18pt; }
+    h2 { font-size: 16pt; margin-top: 22px; }
+    table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+    th, td { border: 1px solid #000; padding: 6px; vertical-align: top; }
+    code, pre { font-family: "Courier New", monospace; font-size: 11pt; }
+  </style>
+</head>
+<body>
+  <h1>Руководство оператора<br>UserService</h1>
+
+  <h2>1. Назначение программы</h2>
+  <p>
+    UserService является микросервисом пользователей и аутентификации учебной платформы StudyBytes.
+    Сервис обеспечивает регистрацию пользователей, вход в систему, выпуск JWT access tokens,
+    хранение refresh tokens, предоставление профиля пользователя и публикацию JWKS endpoint
+    для проверки токенов другими микросервисами.
+  </p>
+
+  <h2>2. Область применения</h2>
+  <p>
+    Руководство предназначено для оператора или администратора, который выполняет развертывание,
+    запуск, остановку, проверку состояния и первичную диагностику UserService на сервере.
+  </p>
+
+  <h2>3. Требования к окружению</h2>
+  <table>
+    <tr><th>Компонент</th><th>Требование</th></tr>
+    <tr><td>Операционная система</td><td>Linux server или VPS с Docker</td></tr>
+    <tr><td>Java</td><td>Java 21 внутри Docker image</td></tr>
+    <tr><td>База данных</td><td>PostgreSQL 16</td></tr>
+    <tr><td>Контейнеризация</td><td>Docker и Docker Compose</td></tr>
+    <tr><td>Сеть</td><td>External network studybytes_backend_net и internal network user_db_net</td></tr>
+  </table>
+
+  <h2>4. Состав сервиса</h2>
+  <p>В Docker Compose запускаются следующие компоненты:</p>
+  <ul>
+    <li><b>user-service</b> - Spring Boot приложение;</li>
+    <li><b>postgres</b> - база данных PostgreSQL;</li>
+    <li><b>user_postgres_data</b> - volume для хранения данных PostgreSQL;</li>
+    <li><b>studybytes_backend_net</b> - общая сеть для Nginx, BFF и микросервисов;</li>
+    <li><b>user_db_net</b> - внутренняя сеть для UserService и PostgreSQL.</li>
+  </ul>
+
+  <h2>5. Переменные окружения</h2>
+  <table>
+    <tr><th>Переменная</th><th>Назначение</th><th>Пример</th></tr>
+    <tr><td>SERVER_PORT</td><td>Порт приложения внутри контейнера и на localhost хоста</td><td>8081</td></tr>
+    <tr><td>POSTGRES_DB</td><td>Имя базы данных</td><td>user_service</td></tr>
+    <tr><td>POSTGRES_USER</td><td>Пользователь PostgreSQL</td><td>postgres</td></tr>
+    <tr><td>POSTGRES_PASSWORD</td><td>Пароль PostgreSQL</td><td>сложный пароль</td></tr>
+    <tr><td>DB_URL</td><td>JDBC URL для подключения к БД</td><td>jdbc:postgresql://postgres:5432/user_service</td></tr>
+    <tr><td>JWT_PRIVATE_KEY</td><td>RSA private key для подписи JWT</td><td>PEM key в одну строку с \n</td></tr>
+    <tr><td>JWT_KEY_ID</td><td>Идентификатор ключа в JWKS</td><td>user-service-rsa-1</td></tr>
+    <tr><td>JWT_ISSUER</td><td>Issuer JWT</td><td>study-platform-user-service</td></tr>
+    <tr><td>JWT_AUDIENCE</td><td>Audience JWT</td><td>study-platform</td></tr>
+  </table>
+
+  <h2>6. Подготовка RSA private key</h2>
+  <p>Для стабильной работы JWT необходимо задать постоянный RSA private key.</p>
+  <pre>openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out jwt-private-key.pem</pre>
+  <p>Преобразовать ключ в формат для .env:</p>
+  <pre>awk 'NF {sub(/\r/, ""); printf "%s\\n",$0;}' jwt-private-key.pem</pre>
+  <p>Полученное значение записывается в переменную JWT_PRIVATE_KEY. Файл ключа нельзя коммитить в репозиторий.</p>
+
+  <h2>7. Первый запуск</h2>
+  <ol>
+    <li>Перейти в директорию проекта на сервере.</li>
+    <li>Создать общую Docker network, если она еще не создана:</li>
+  </ol>
+  <pre>docker network create studybytes_backend_net</pre>
+  <ol start="3">
+    <li>Проверить наличие файла .env и корректность переменных.</li>
+    <li>Запустить сервис:</li>
+  </ol>
+  <pre>docker compose up -d --build</pre>
+
+  <h2>8. Остановка и перезапуск</h2>
+  <p>Остановить сервис:</p>
+  <pre>docker compose down</pre>
+  <p>Перезапустить сервис:</p>
+  <pre>docker compose up -d --build</pre>
+  <p>Посмотреть состояние контейнеров:</p>
+  <pre>docker compose ps</pre>
+
+  <h2>9. Проверка работоспособности</h2>
+  <p>Проверить health endpoint:</p>
+  <pre>curl -fsS http://127.0.0.1:8081/health</pre>
+  <p>Ожидаемый ответ содержит:</p>
+  <pre>{"status":"UP","service":"UserService","timestamp":"..."}</pre>
+
+  <h2>10. Проверка Swagger/OpenAPI</h2>
+  <p>Swagger UI:</p>
+  <pre>http://127.0.0.1:8081/swagger-ui/index.html</pre>
+  <p>OpenAPI JSON:</p>
+  <pre>http://127.0.0.1:8081/v3/api-docs</pre>
+
+  <h2>11. Проверка JWKS</h2>
+  <p>Локальный endpoint:</p>
+  <pre>curl http://127.0.0.1:8081/api/v1/auth/.well-known/jwks.json</pre>
+  <p>Публичный endpoint через Nginx:</p>
+  <pre>https://study-byte.ru/user-service/api/v1/auth/.well-known/jwks.json</pre>
+  <p>Ответ должен содержать публичные поля RSA ключа: kty, use, kid, alg, n, e. Приватные поля d, p, q отсутствуют.</p>
+
+  <h2>12. Просмотр логов</h2>
+  <pre>docker logs user-service -f</pre>
+  <pre>docker logs user-service-postgres -f</pre>
+  <p>В логах не должны выводиться приватные ключи, пароли, refresh tokens и значения token hash.</p>
+
+  <h2>13. Типовые ошибки и действия оператора</h2>
+  <table>
+    <tr><th>Ошибка</th><th>Причина</th><th>Действие</th></tr>
+    <tr><td>Failed to load RSA JWT private key</td><td>JWT_PRIVATE_KEY не является PEM RSA private key</td><td>Сгенерировать корректный RSA key и обновить .env</td></tr>
+    <tr><td>Connection refused к PostgreSQL</td><td>БД не запущена или неверный DB_URL</td><td>Проверить docker compose ps и переменные БД</td></tr>
+    <tr><td>401 Unauthorized</td><td>Нет access token или token истек</td><td>Выполнить login или refresh</td></tr>
+    <tr><td>403 Forbidden</td><td>Недостаточно роли</td><td>Проверить roles claim и права пользователя</td></tr>
+    <tr><td>JWKS недоступен через домен</td><td>Ошибка Nginx proxy или Docker binding</td><td>Проверить localhost endpoint и конфиг Nginx</td></tr>
+  </table>
+
+  <h2>14. Резервное копирование базы данных</h2>
+  <p>Пример создания dump:</p>
+  <pre>docker exec user-service-postgres pg_dump -U postgres user_service &gt; user_service_backup.sql</pre>
+  <p>Восстановление выполняется только после остановки сервиса или в согласованное окно обслуживания.</p>
+
+  <h2>15. Правила безопасности</h2>
+  <ul>
+    <li>Не коммитить .env, *.pem, *.key.</li>
+    <li>Не передавать JWT_PRIVATE_KEY другим микросервисам.</li>
+    <li>Другие сервисы проверяют JWT только через публичный JWKS.</li>
+    <li>Регулярно проверять доступность /health и JWKS после обновлений.</li>
+  </ul>
+</body>
+</html>
