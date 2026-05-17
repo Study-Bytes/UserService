@@ -38,7 +38,9 @@ Spring Security для защиты API и RS256 JWT для аутентифик
 - Отзыв refresh tokens при logout.
 - Проверка JWT и ролей.
 - Профиль текущего пользователя.
+- Настройки текущего пользователя.
 - Admin lookup пользователя по id.
+- Создание и модерация teacher requests.
 - JWKS endpoint.
 - Health endpoint.
 - Swagger/OpenAPI endpoint.
@@ -112,9 +114,17 @@ docker compose up -d --build
 | 14 | JWKS endpoint | `GET /api/v1/auth/.well-known/jwks.json` | HTTP 200, есть `kty`, `use`, `kid`, `alg`, `n`, `e` |
 | 15 | Отсутствие private key в JWKS | Проверить JSON JWKS | Нет полей `d`, `p`, `q`, `JWT_PRIVATE_KEY` |
 | 16 | Swagger UI | Открыть `/swagger-ui/index.html` | Swagger UI доступен |
-| 17 | Обновление профиля | `PUT /api/v1/users/me/profile` с Bearer token и body `fullName`, `avatarUrl`, `bio` | Возвращен обновленный `CurrentUser` |
-| 18 | Смена пароля | `PUT /api/v1/users/me/password` с Bearer token и body `currentPassword`, `newPassword` | HTTP 204 |
-| 19 | Запрет ADMIN регистрации | `POST /api/v1/auth/register` с `role = ADMIN` | HTTP 400 Bad Request |
+| 17 | Получение настроек | `GET /api/v1/users/me/settings` с Bearer token | Возвращены `fullName`, `avatarUrl`, `bio`, `preferredLocale` |
+| 18 | Обновление настроек | `PUT /api/v1/users/me/settings` с Bearer token и body `fullName`, `avatarUrl`, `bio`, `preferredLocale` | Возвращены обновленные настройки пользователя |
+| 19 | Валидация locale | `PUT /api/v1/users/me/settings` с `preferredLocale = de` | HTTP 400 Bad Request |
+| 20 | Создание teacher request | `POST /api/v1/teacher-requests` с Bearer token STUDENT | HTTP 201 Created, `status = PENDING` |
+| 21 | Дубликат pending teacher request | Повторить `POST /api/v1/teacher-requests` для того же пользователя | HTTP 409 Conflict |
+| 22 | Получение своей teacher request | `GET /api/v1/teacher-requests/me` с Bearer token | Возвращен объект заявки или `204 No Content` |
+| 23 | Список заявок (ADMIN) | `GET /api/v1/admin/teacher-requests?status=PENDING&page=0&size=20` под ADMIN | Возвращена страница заявок |
+| 24 | Approve teacher request (ADMIN) | `POST /api/v1/admin/teacher-requests/{id}/approve` под ADMIN | `status = APPROVED`, роль пользователя изменена на `TEACHER` |
+| 25 | Reject teacher request (ADMIN) | `POST /api/v1/admin/teacher-requests/{id}/reject` с `reviewComment` | `status = REJECTED`, сохранен `reviewComment` |
+| 26 | Смена пароля | `PUT /api/v1/users/me/password` с Bearer token и body `currentPassword`, `newPassword` | HTTP 204 |
+| 27 | Запрет ADMIN регистрации | `POST /api/v1/auth/register` с `role = ADMIN` | HTTP 400 Bad Request |
 
 ## 9. Проверка JWT/JWKS
 

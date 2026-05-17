@@ -13,6 +13,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 import org.studyplatform.userService.dto.ChangePasswordRequest;
 import org.studyplatform.userService.dto.UpdateProfileRequest;
+import org.studyplatform.userService.dto.UserSettingsRequest;
 import org.studyplatform.userService.entity.Role;
 import org.studyplatform.userService.entity.User;
 import org.studyplatform.userService.exception.UserNotFoundException;
@@ -87,6 +88,69 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.fullName").value("Updated User"))
                 .andExpect(jsonPath("$.avatarUrl").value("https://example.com/avatar.png"))
                 .andExpect(jsonPath("$.bio").value("Java student"));
+    }
+
+
+    @Test
+    void settings_WhenAuthenticated_ShouldReturnCurrentUserSettings() throws Exception {
+        User currentUser = user(1L, "student@example.com", "Student User", Role.STUDENT);
+        currentUser.setAvatarUrl("https://example.com/avatar.png");
+        currentUser.setBio("Java learner");
+        currentUser.setPreferredLocale("ru");
+        when(userService.findByEmail("student@example.com")).thenReturn(currentUser);
+
+        mockMvc.perform(get("/api/v1/users/me/settings")
+                        .principal(new TestingAuthenticationToken("student@example.com", null)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.email").value("student@example.com"))
+                .andExpect(jsonPath("$.fullName").value("Student User"))
+                .andExpect(jsonPath("$.role").value("STUDENT"))
+                .andExpect(jsonPath("$.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.avatarUrl").value("https://example.com/avatar.png"))
+                .andExpect(jsonPath("$.bio").value("Java learner"))
+                .andExpect(jsonPath("$.preferredLocale").value("ru"));
+    }
+
+    @Test
+    void updateSettings_WhenAuthenticated_ShouldReturnUpdatedSettings() throws Exception {
+        UserSettingsRequest request = new UserSettingsRequest();
+        request.setFullName("Updated User");
+        request.setAvatarUrl("https://example.com/avatar.png");
+        request.setBio("Java learner");
+        request.setPreferredLocale("en");
+
+        User updatedUser = user(1L, "student@example.com", "Updated User", Role.STUDENT);
+        updatedUser.setAvatarUrl("https://example.com/avatar.png");
+        updatedUser.setBio("Java learner");
+        updatedUser.setPreferredLocale("en");
+        when(userService.updateSettings(org.mockito.Mockito.eq("student@example.com"), org.mockito.Mockito.any(UserSettingsRequest.class)))
+                .thenReturn(updatedUser);
+
+        mockMvc.perform(put("/api/v1/users/me/settings")
+                        .principal(new TestingAuthenticationToken("student@example.com", null))
+                        .contentType("application/json")
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.fullName").value("Updated User"))
+                .andExpect(jsonPath("$.avatarUrl").value("https://example.com/avatar.png"))
+                .andExpect(jsonPath("$.bio").value("Java learner"))
+                .andExpect(jsonPath("$.preferredLocale").value("en"));
+    }
+
+    @Test
+    void updateSettings_WithUnsupportedLocale_ShouldReturnBadRequest() throws Exception {
+        UserSettingsRequest request = new UserSettingsRequest();
+        request.setFullName("Updated User");
+        request.setPreferredLocale("de");
+
+        mockMvc.perform(put("/api/v1/users/me/settings")
+                        .principal(new TestingAuthenticationToken("student@example.com", null))
+                        .contentType("application/json")
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("preferredLocale")));
     }
 
     @Test

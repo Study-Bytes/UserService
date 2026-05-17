@@ -8,10 +8,10 @@ public class UpdateProfileRequest {
     @Size(max = 255)
     private String fullName;
 
-    @Size(max = 500)
+    @Size(max = 1000)
     private String avatarUrl;
 
-    @Size(max = 1000)
+    @Size(max = 2000)
     private String bio;
 
     public String getFullName() {

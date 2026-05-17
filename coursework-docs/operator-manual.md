@@ -4,7 +4,7 @@
 
 UserService является микросервисом пользователей и аутентификации учебной платформы StudyBytes.
 Сервис обеспечивает регистрацию пользователей, вход в систему, выпуск JWT access tokens,
-хранение refresh tokens, предоставление профиля пользователя и публикацию JWKS endpoint
+хранение refresh tokens, предоставление настроек аккаунта и публикацию JWKS endpoint
 для проверки токенов другими микросервисами.
 
 ## 2. Область применения
@@ -148,7 +148,28 @@ https://study-byte.ru/user-service/api/v1/auth/.well-known/jwks.json
 Ответ должен содержать публичные поля RSA ключа: `kty`, `use`, `kid`, `alg`, `n`, `e`.
 Приватные поля `d`, `p`, `q` отсутствуют.
 
-## 12. Просмотр логов
+## 12. Актуальный список endpoint-ов
+
+```text
+GET  /health
+POST /api/v1/auth/register
+POST /api/v1/auth/login
+POST /api/v1/auth/refresh
+POST /api/v1/auth/logout
+GET  /api/v1/auth/.well-known/jwks.json
+GET  /api/v1/users/me
+GET  /api/v1/users/me/settings
+PUT  /api/v1/users/me/settings
+PUT  /api/v1/users/me/password
+GET  /api/v1/users/{id}
+POST /api/v1/teacher-requests
+GET  /api/v1/teacher-requests/me
+GET  /api/v1/admin/teacher-requests
+POST /api/v1/admin/teacher-requests/{requestId}/approve
+POST /api/v1/admin/teacher-requests/{requestId}/reject
+```
+
+## 13. Просмотр логов
 
 ```bash
 docker logs user-service -f
@@ -157,7 +178,7 @@ docker logs user-service-postgres -f
 
 В логах не должны выводиться приватные ключи, пароли, refresh tokens и значения token hash.
 
-## 13. Типовые ошибки и действия оператора
+## 14. Типовые ошибки и действия оператора
 
 | Ошибка | Причина | Действие |
 | --- | --- | --- |
@@ -167,7 +188,7 @@ docker logs user-service-postgres -f
 | `403 Forbidden` | Недостаточно роли | Проверить `roles` claim и права пользователя |
 | JWKS недоступен через домен | Ошибка Nginx proxy или Docker binding | Проверить localhost endpoint и конфиг Nginx |
 
-## 14. Резервное копирование базы данных
+## 15. Резервное копирование базы данных
 
 Пример создания dump:
 
@@ -177,7 +198,7 @@ docker exec user-service-postgres pg_dump -U postgres user_service > user_servic
 
 Восстановление выполняется только после остановки сервиса или в согласованное окно обслуживания.
 
-## 15. Правила безопасности
+## 16. Правила безопасности
 
 - Не коммитить `.env`, `*.pem`, `*.key`.
 - Не передавать `JWT_PRIVATE_KEY` другим микросервисам.

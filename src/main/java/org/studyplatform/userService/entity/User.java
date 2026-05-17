@@ -26,11 +26,14 @@ public class User {
     @Column(nullable = false)
     private UserStatus status = UserStatus.ACTIVE;
 
-    @Column(name = "avatar_url")
+    @Column(name = "avatar_url", length = 1000)
     private String avatarUrl;
 
-    @Column(length = 1000)
+    @Column(length = 2000)
     private String bio;
+
+    @Column(name = "preferred_locale", nullable = false, length = 10)
+    private String preferredLocale = "ru";
 
     public User() {
     }
@@ -104,5 +107,13 @@ public class User {
 
     public void setBio(String bio) {
         this.bio = bio;
+    }
+
+    public String getPreferredLocale() {
+        return preferredLocale;
+    }
+
+    public void setPreferredLocale(String preferredLocale) {
+        this.preferredLocale = preferredLocale;
     }
 }
