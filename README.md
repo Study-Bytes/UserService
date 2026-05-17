@@ -418,6 +418,18 @@ git diff --exit-code openapi.yml
 | `JPA_SHOW_SQL` | `false` | Печать SQL запросов |
 | `HIBERNATE_FORMAT_SQL` | `false` | Форматирование SQL логов |
 | `FLYWAY_ENABLED` | `false` | Включение Flyway |
+
+## Upgrade note (V2 Flyway repair)
+
+Если в боевой БД уже есть таблица `users`, но отсутствует колонка `preferred_locale` (или не применились account settings / teacher request изменения), включите Flyway и перезапустите сервис один раз:
+
+```bash
+FLYWAY_ENABLED=true
+FLYWAY_BASELINE_ON_MIGRATE=true
+docker compose up -d --build user-service
+```
+
+Миграция `V2__repair_schema_for_account_settings_and_teacher_requests.sql` добавляет недостающие поля и таблицу `teacher_requests` для legacy-схем после baseline.
 | `FLYWAY_BASELINE_ON_MIGRATE` | `true` | Baseline для существующей схемы при включении Flyway |
 | `LOG_LEVEL_ROOT` | `INFO` | Root log level |
 | `LOG_LEVEL_WEB` | `INFO` | Spring Web log level |
