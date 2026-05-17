@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.studyplatform.userService.dto.ChangePasswordRequest;
 import org.studyplatform.userService.dto.CurrentUser;
 import org.studyplatform.userService.dto.UpdateProfileRequest;
+import org.studyplatform.userService.dto.UserSettingsRequest;
+import org.studyplatform.userService.dto.UserSettingsResponse;
 import org.studyplatform.userService.entity.User;
 import org.studyplatform.userService.service.UserService;
 
@@ -38,6 +40,21 @@ public class UserController {
     ) {
         User user = userService.updateProfile(authentication.getName(), request);
         return CurrentUser.from(user);
+    }
+
+    @GetMapping("/me/settings")
+    public UserSettingsResponse settings(Authentication authentication) {
+        User user = userService.findByEmail(authentication.getName());
+        return UserSettingsResponse.from(user);
+    }
+
+    @PutMapping("/me/settings")
+    public UserSettingsResponse updateSettings(
+            Authentication authentication,
+            @Valid @RequestBody UserSettingsRequest request
+    ) {
+        User user = userService.updateSettings(authentication.getName(), request);
+        return UserSettingsResponse.from(user);
     }
 
     @PutMapping("/me/password")

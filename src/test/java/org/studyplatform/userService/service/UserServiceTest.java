@@ -11,6 +11,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.studyplatform.userService.dto.RegisterRequest;
 import org.studyplatform.userService.dto.ChangePasswordRequest;
 import org.studyplatform.userService.dto.UpdateProfileRequest;
+import org.studyplatform.userService.dto.UserSettingsRequest;
 import org.studyplatform.userService.entity.Role;
 import org.studyplatform.userService.entity.User;
 import org.studyplatform.userService.entity.UserStatus;
@@ -170,6 +171,37 @@ class UserServiceTest {
         assertEquals("Updated Student", result.getFullName());
         assertEquals("https://example.com/avatar.png", result.getAvatarUrl());
         assertEquals("Java student", result.getBio());
+        verify(userRepository).save(user);
+    }
+
+
+    @Test
+    void updateSettings_ShouldSaveAllowedAccountFieldsOnly() {
+        User user = new User();
+        user.setId(7L);
+        user.setEmail("student@test.com");
+        user.setPassword("old-hash");
+        user.setRole(Role.STUDENT);
+        user.setStatus(UserStatus.ACTIVE);
+        when(userRepository.findByEmail("student@test.com")).thenReturn(Optional.of(user));
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UserSettingsRequest settingsRequest = new UserSettingsRequest();
+        settingsRequest.setFullName("Updated Student");
+        settingsRequest.setAvatarUrl("https://example.com/avatar.png");
+        settingsRequest.setBio("Java learner");
+        settingsRequest.setPreferredLocale("en");
+
+        User result = userService.updateSettings("student@test.com", settingsRequest);
+
+        assertEquals("Updated Student", result.getFullName());
+        assertEquals("https://example.com/avatar.png", result.getAvatarUrl());
+        assertEquals("Java learner", result.getBio());
+        assertEquals("en", result.getPreferredLocale());
+        assertEquals("student@test.com", result.getEmail());
+        assertEquals("old-hash", result.getPassword());
+        assertEquals(Role.STUDENT, result.getRole());
+        assertEquals(UserStatus.ACTIVE, result.getStatus());
         verify(userRepository).save(user);
     }
 

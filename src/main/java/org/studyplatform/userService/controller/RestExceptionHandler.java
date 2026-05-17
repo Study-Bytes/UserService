@@ -10,6 +10,7 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.studyplatform.userService.exception.ConflictException;
 import org.studyplatform.userService.exception.EmailAlreadyTakenException;
 import org.studyplatform.userService.exception.InvalidTokenException;
 import org.studyplatform.userService.exception.InvalidUserRoleException;
@@ -26,6 +27,12 @@ public class RestExceptionHandler {
     @ExceptionHandler(EmailAlreadyTakenException.class)
     public ResponseEntity<?> handleEmailTaken(EmailAlreadyTakenException e) {
         log.warn("Email conflict: {}", e.getMessage());
+        return buildError(HttpStatus.CONFLICT, e.getMessage());
+    }
+
+    @ExceptionHandler(ConflictException.class)
+    public ResponseEntity<?> handleConflict(ConflictException e) {
+        log.warn("Conflict: {}", e.getMessage());
         return buildError(HttpStatus.CONFLICT, e.getMessage());
     }
 

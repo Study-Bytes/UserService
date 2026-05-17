@@ -35,7 +35,9 @@ UserService отвечает на вопрос:
 Он хранит:
 
 - учетные записи пользователей;
-- email, хеш пароля, полное имя и роль пользователя;
+- email, хеш пароля, полное имя, роль и статус пользователя;
+- настройки аккаунта: avatarUrl, bio и preferredLocale (`ru` или `en`);
+- заявки пользователей на получение роли TEACHER и результат модерации;
 - refresh tokens в виде хешей;
 - состояние отзыва refresh tokens;
 - настройки выпуска JWT access и refresh tokens.
@@ -55,7 +57,8 @@ UserService отвечает на вопрос:
 
 ```text
 User
- └── RefreshToken
+ ├── RefreshToken
+ └── TeacherRequest
 ```
 
 `User` представляет аккаунт пользователя платформы.
@@ -69,6 +72,8 @@ ADMIN
 ```
 
 `RefreshToken` хранит не исходный token, а его hash. При logout UserService отзывает refresh tokens пользователя. Access tokens остаются действительными до истечения короткого срока жизни.
+
+`TeacherRequest` хранит заявку STUDENT-пользователя на роль TEACHER. Администратор может одобрить заявку, тогда роль пользователя меняется на `TEACHER`, или отклонить ее с комментарием.
 
 ## Публичная Auth API
 
@@ -144,7 +149,8 @@ Endpoints:
 
 ```text
 GET /api/v1/users/me
-PUT /api/v1/users/me/profile
+GET /api/v1/users/me/settings
+PUT /api/v1/users/me/settings
 PUT /api/v1/users/me/password
 GET /api/v1/users/{id}
 ```
@@ -157,17 +163,9 @@ Authorization: Bearer <access-token>
 
 `GET /api/v1/users/{id}` возвращает пользователя по ID. Endpoint доступен только пользователю с ролью `ADMIN`.
 
-`PUT /api/v1/users/me/profile` обновляет профиль текущего пользователя.
+`GET /api/v1/users/me/settings` возвращает настройки аккаунта текущего пользователя.
 
-Пример запроса:
-
-```json
-{
-  "fullName": "Иван Иванов",
-  "avatarUrl": "https://example.com/avatar.png",
-  "bio": "Java student"
-}
-```
+`PUT /api/v1/users/me/settings` обновляет только разрешенные frontend-facing поля: `fullName`, `avatarUrl`, `bio`, `preferredLocale`. Поля `id`, `email`, `role`, `status` и пароль через этот endpoint не меняются. `preferredLocale` принимает только `ru` или `en`.
 
 `PUT /api/v1/users/me/password` меняет пароль текущего пользователя.
 
@@ -190,8 +188,58 @@ Authorization: Bearer <access-token>
   "role": "STUDENT",
   "status": "ACTIVE",
   "avatarUrl": null,
-  "bio": null
+  "bio": null,
+  "preferredLocale": "ru"
 }
+```
+
+
+## Teacher Request API
+
+Базовые endpoints:
+
+```text
+POST /api/v1/teacher-requests
+GET  /api/v1/teacher-requests/me
+GET  /api/v1/admin/teacher-requests
+POST /api/v1/admin/teacher-requests/{requestId}/approve
+POST /api/v1/admin/teacher-requests/{requestId}/reject
+```
+
+`POST /api/v1/teacher-requests` доступен authenticated STUDENT-пользователю. Если у пользователя уже есть активная `PENDING` заявка или его роль уже `TEACHER`/`ADMIN`, сервис возвращает `409 Conflict`.
+
+При одобрении заявки администратором UserService меняет роль пользователя с `STUDENT` на `TEACHER`. При отклонении сохраняется `reviewComment`.
+
+Пример создания заявки:
+
+```json
+{
+  "motivation": "I want to create Java courses.",
+  "experience": "3 years of Java backend experience.",
+  "portfolioUrl": "https://example.com",
+  "preferredTopics": ["Java", "Spring Boot"]
+}
+```
+
+## Unified Endpoint List
+
+```text
+GET  /health
+POST /api/v1/auth/register
+POST /api/v1/auth/login
+POST /api/v1/auth/refresh
+POST /api/v1/auth/logout
+GET  /api/v1/auth/.well-known/jwks.json
+GET  /api/v1/users/me
+GET  /api/v1/users/me/settings
+PUT  /api/v1/users/me/settings
+PUT  /api/v1/users/me/password
+GET  /api/v1/users/{id}
+POST /api/v1/teacher-requests
+GET  /api/v1/teacher-requests/me
+GET  /api/v1/admin/teacher-requests
+POST /api/v1/admin/teacher-requests/{requestId}/approve
+POST /api/v1/admin/teacher-requests/{requestId}/reject
 ```
 
 ## Health Check
@@ -226,8 +274,11 @@ UserService разделяет публичные и защищенные endpoi
 /api/v1/auth/.well-known/jwks.json   -> public
 /api/v1/auth/logout                  -> app-level Bearer access token validation
 /api/v1/users/me                     -> Bearer JWT
-/api/v1/users/me/profile             -> Bearer JWT
+/api/v1/users/me/settings            -> Bearer JWT
 /api/v1/users/me/password            -> Bearer JWT
+/api/v1/teacher-requests             -> Bearer JWT
+/api/v1/teacher-requests/me          -> Bearer JWT
+/api/v1/admin/teacher-requests/**    -> Bearer JWT + ADMIN
 /api/v1/users/{id}                   -> Bearer JWT + ADMIN
 ```
 
@@ -367,6 +418,7 @@ git diff --exit-code openapi.yml
 | `JPA_SHOW_SQL` | `false` | Печать SQL запросов |
 | `HIBERNATE_FORMAT_SQL` | `false` | Форматирование SQL логов |
 | `FLYWAY_ENABLED` | `false` | Включение Flyway |
+| `FLYWAY_BASELINE_ON_MIGRATE` | `true` | Baseline для существующей схемы при включении Flyway |
 | `LOG_LEVEL_ROOT` | `INFO` | Root log level |
 | `LOG_LEVEL_WEB` | `INFO` | Spring Web log level |
 | `LOG_LEVEL_SECURITY` | `INFO` | Spring Security log level |
@@ -466,13 +518,30 @@ curl http://localhost:8081/api/v1/users/me \
   -H "Authorization: Bearer <access-token>"
 ```
 
-Обновление профиля:
+
+Настройки аккаунта:
 
 ```bash
-curl -X PUT http://localhost:8081/api/v1/users/me/profile \
+curl http://localhost:8081/api/v1/users/me/settings \
+  -H "Authorization: Bearer <access-token>"
+```
+
+Обновление настроек:
+
+```bash
+curl -X PUT http://localhost:8081/api/v1/users/me/settings \
   -H "Authorization: Bearer <access-token>" \
   -H 'Content-Type: application/json' \
-  -d '{"fullName":"Иван Обновленный","avatarUrl":"https://example.com/avatar.png","bio":"Java student"}'
+  -d '{"fullName":"Иван Обновленный","avatarUrl":"https://example.com/avatar.png","bio":"Java learner","preferredLocale":"ru"}'
+```
+
+Заявка на роль преподавателя:
+
+```bash
+curl -X POST http://localhost:8081/api/v1/teacher-requests \
+  -H "Authorization: Bearer <access-token>" \
+  -H 'Content-Type: application/json' \
+  -d '{"motivation":"I want to create Java courses.","experience":"3 years of Java backend experience.","portfolioUrl":"https://example.com","preferredTopics":["Java","Spring Boot"]}'
 ```
 
 Смена пароля:

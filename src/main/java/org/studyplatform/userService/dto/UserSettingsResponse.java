@@ -2,7 +2,7 @@ package org.studyplatform.userService.dto;
 
 import org.studyplatform.userService.entity.User;
 
-public class CurrentUser {
+public class UserSettingsResponse {
     private Long id;
     private String email;
     private String fullName;
@@ -12,7 +12,8 @@ public class CurrentUser {
     private String bio;
     private String preferredLocale;
 
-    public CurrentUser(Long id, String email, String fullName, String role, String status, String avatarUrl, String bio, String preferredLocale) {
+    public UserSettingsResponse(Long id, String email, String fullName, String role, String status,
+                                String avatarUrl, String bio, String preferredLocale) {
         this.id = id;
         this.email = email;
         this.fullName = fullName;
@@ -23,8 +24,8 @@ public class CurrentUser {
         this.preferredLocale = preferredLocale;
     }
 
-    public static CurrentUser from(User user) {
-        return new CurrentUser(
+    public static UserSettingsResponse from(User user) {
+        return new UserSettingsResponse(
                 user.getId(),
                 user.getEmail(),
                 user.getFullName(),
@@ -36,35 +37,12 @@ public class CurrentUser {
         );
     }
 
-    public Long getId() {
-        return id;
-    }
-
-    public String getEmail() {
-        return email;
-    }
-
-    public String getFullName() {
-        return fullName;
-    }
-
-    public String getRole() {
-        return role;
-    }
-
-    public String getStatus() {
-        return status;
-    }
-
-    public String getAvatarUrl() {
-        return avatarUrl;
-    }
-
-    public String getBio() {
-        return bio;
-    }
-
-    public String getPreferredLocale() {
-        return preferredLocale;
-    }
+    public Long getId() { return id; }
+    public String getEmail() { return email; }
+    public String getFullName() { return fullName; }
+    public String getRole() { return role; }
+    public String getStatus() { return status; }
+    public String getAvatarUrl() { return avatarUrl; }
+    public String getBio() { return bio; }
+    public String getPreferredLocale() { return preferredLocale; }
 }

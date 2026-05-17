@@ -4,7 +4,7 @@ info:
   version: 2.0.0
   description: >
     Сервис управления пользователями и аутентификацией. Обрабатывает регистрацию,
-    вход, обновление токенов, выход и управление профилями пользователей.
+    вход, обновление токенов, выход, настройки аккаунта и заявки на роль преподавателя.
 
 servers:
   - url: http://localhost:8081
@@ -15,6 +15,10 @@ tags:
     description: Регистрация, вход, обновление токенов, выход
   - name: Users
     description: Управление пользователями и профилями
+  - name: Teacher Requests
+    description: Заявки пользователей на роль преподавателя
+  - name: Admin Teacher Requests
+    description: Административная модерация заявок преподавателей
   - name: Health
     description: Проверка доступности сервиса
 
@@ -79,15 +83,12 @@ paths:
             schema:
               $ref: '#/components/schemas/RegisterRequest'
       responses:
-        '201':
-          description: Пользователь успешно зарегистрирован
+        '200':
+          description: Пользователь успешно зарегистрирован, выданы access и refresh токены
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RegisterResponse'
-              example:
-                message: "User registered successfully"
-                userId: 123
+                $ref: '#/components/schemas/AuthResponse'
         '400':
           description: Ошибка валидации запроса (невалидный email, пароль короче 8 символов)
           content:
@@ -174,11 +175,21 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RefreshResponse'
+                $ref: '#/components/schemas/AuthResponse'
               example:
-                message: "Access token refreshed successfully"
+                user:
+                  id: 2
+                  email: "test2@mail.com"
+                  fullName: "Тест Тестов"
+                  role: "STUDENT"
+                  status: "ACTIVE"
+                  avatarUrl: null
+                  bio: null
+                  preferredLocale: "ru"
                 accessToken: "eyJhbGciOiJIUzI1NiJ9.eyJzdWIi..."
+                refreshToken: "eyJhbGciOiJIUzI1NiJ9.eyJzdWIi..."
                 tokenType: "Bearer"
+                expiresIn: 900
         '400':
           description: Ошибка валидации запроса
           content:
@@ -219,41 +230,26 @@ paths:
       summary: Выход из системы (отзыв refresh токенов)
       tags: [Authentication]
       description: >
-        Отзывает все refresh токены пользователя. Пользователь будет разлогинен
-        на всех устройствах. Access токены продолжат работать до истечения срока (15 минут).
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RefreshRequest'
+        Отзывает все refresh токены пользователя по access token из заголовка
+        Authorization. Body не требуется.
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          schema:
+            type: string
+          description: Bearer access token
       responses:
-        '200':
+        '204':
           description: Успешный выход, все refresh токены отозваны
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LogoutResponse'
-              example:
-                message: "Logged out successfully"
-        '400':
-          description: Refresh токен не предоставлен
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                message: "refreshToken: must not be blank"
-                code: 400
-                timestamp: "2026-02-24T12:00:00Z"
         '401':
-          description: Refresh токен не найден в базе данных
+          description: Access token отсутствует, невалидный или истек
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
-                message: "Refresh token not found"
+                message: "Invalid or expired access token"
                 code: 401
                 timestamp: "2026-02-24T12:00:00Z"
         '500':
@@ -284,6 +280,261 @@ paths:
                 timestamp: "2026-02-24T12:00:00Z"
         '500':
           description: Ошибка сервиса
+
+
+  /api/v1/users/me/settings:
+    get:
+      summary: Получить настройки текущего пользователя
+      tags: [Users]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Настройки аккаунта пользователя
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSettingsResponse'
+        '401':
+          description: Access токен отсутствует, невалидный или истек
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/users/me/password:
+    put:
+      summary: Сменить пароль текущего пользователя
+      tags: [Users]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+      responses:
+        '204':
+          description: Пароль успешно обновлен
+        '400':
+          description: Ошибка валидации запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Access токен отсутствует, невалидный или истек
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      summary: Обновить настройки текущего пользователя
+      tags: [Users]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserSettingsRequest'
+      responses:
+        '200':
+          description: Настройки аккаунта обновлены
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSettingsResponse'
+        '400':
+          description: Ошибка валидации запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Access токен отсутствует, невалидный или истек
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/teacher-requests:
+    post:
+      summary: Создать заявку на роль преподавателя
+      tags: [Teacher Requests]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TeacherRequestCreateRequest'
+      responses:
+        '201':
+          description: Заявка создана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeacherRequestResponse'
+        '400':
+          description: Ошибка валидации запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Access токен отсутствует, невалидный или истек
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Заявка уже ожидает рассмотрения или пользователь уже TEACHER/ADMIN
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/teacher-requests/me:
+    get:
+      summary: Получить текущую заявку пользователя на роль преподавателя
+      tags: [Teacher Requests]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Последняя заявка пользователя
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeacherRequestResponse'
+        '204':
+          description: У пользователя нет заявок
+        '401':
+          description: Access токен отсутствует, невалидный или истек
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/admin/teacher-requests:
+    get:
+      summary: Получить список заявок на роль преподавателя
+      tags: [Admin Teacher Requests]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/TeacherRequestStatus'
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Страница заявок
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeacherRequestPageResponse'
+        '403':
+          description: Недостаточно прав, требуется ADMIN
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/admin/teacher-requests/{requestId}/approve:
+    post:
+      summary: Одобрить заявку и повысить пользователя до TEACHER
+      tags: [Admin Teacher Requests]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Заявка одобрена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeacherRequestResponse'
+        '403':
+          description: Недостаточно прав, требуется ADMIN
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Заявка не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/admin/teacher-requests/{requestId}/reject:
+    post:
+      summary: Отклонить заявку на роль преподавателя
+      tags: [Admin Teacher Requests]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TeacherRequestRejectRequest'
+      responses:
+        '200':
+          description: Заявка отклонена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeacherRequestResponse'
+        '400':
+          description: Ошибка валидации запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Недостаточно прав, требуется ADMIN
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Заявка не найдена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /api/v1/users/{id}:
     get:
@@ -352,7 +603,7 @@ components:
   schemas:
     RegisterRequest:
       type: object
-      required: [email, password]
+      required: [email, password, fullName]
       properties:
         email:
           type: string
@@ -366,19 +617,13 @@ components:
           example: "securePassword123"
         fullName:
           type: string
-          description: Полное имя пользователя (опционально)
+          description: Полное имя пользователя
           example: "Иван Иванов"
-
-    RegisterResponse:
-      type: object
-      properties:
-        message:
+        role:
           type: string
-          example: "User registered successfully"
-        userId:
-          type: integer
-          format: int64
-          example: 123
+          enum: [STUDENT, TEACHER]
+          description: Роль пользователя при self-service регистрации, по умолчанию STUDENT
+          example: "STUDENT"
 
     LoginRequest:
       type: object
@@ -422,26 +667,17 @@ components:
           description: Срок действия access токена в секундах
           example: 900
 
-    RefreshResponse:
+    ChangePasswordRequest:
       type: object
+      required: [currentPassword, newPassword]
       properties:
-        message:
+        currentPassword:
           type: string
-          example: "Access token refreshed successfully"
-        accessToken:
+          example: "securePassword123"
+        newPassword:
           type: string
-          description: Новый JWT access токен
-          example: "eyJhbGciOiJIUzI1NiJ9.eyJzdWIi..."
-        tokenType:
-          type: string
-          example: "Bearer"
-
-    LogoutResponse:
-      type: object
-      properties:
-        message:
-          type: string
-          example: "Logged out successfully"
+          minLength: 8
+          example: "newSecurePassword123"
 
     UserDto:
       type: object
@@ -464,6 +700,157 @@ components:
           enum: [STUDENT, TEACHER, ADMIN]
           description: Роль пользователя в системе
           example: "STUDENT"
+        status:
+          type: string
+          enum: [ACTIVE, BLOCKED, DELETED]
+          description: Статус пользователя
+          example: "ACTIVE"
+        avatarUrl:
+          type: string
+          nullable: true
+          maxLength: 1000
+          example: "https://example.com/avatar.png"
+        bio:
+          type: string
+          nullable: true
+          maxLength: 2000
+          example: "Java learner"
+        preferredLocale:
+          type: string
+          enum: [ru, en]
+          example: "ru"
+
+
+    UserSettingsRequest:
+      type: object
+      required: [fullName, preferredLocale]
+      properties:
+        fullName:
+          type: string
+          maxLength: 255
+          example: "Roman Aksenov"
+        avatarUrl:
+          type: string
+          nullable: true
+          maxLength: 1000
+          example: "https://example.com/avatar.png"
+        bio:
+          type: string
+          nullable: true
+          maxLength: 2000
+          example: "Java learner"
+        preferredLocale:
+          type: string
+          enum: [ru, en]
+          example: "ru"
+
+    UserSettingsResponse:
+      allOf:
+        - $ref: '#/components/schemas/UserDto'
+
+    TeacherRequestStatus:
+      type: string
+      enum: [PENDING, APPROVED, REJECTED, CANCELLED]
+
+    TeacherRequestCreateRequest:
+      type: object
+      required: [motivation]
+      properties:
+        motivation:
+          type: string
+          example: "I want to create Java courses."
+        experience:
+          type: string
+          nullable: true
+          example: "3 years of Java backend experience."
+        portfolioUrl:
+          type: string
+          nullable: true
+          maxLength: 1000
+          example: "https://example.com"
+        preferredTopics:
+          type: array
+          items:
+            type: string
+          example: ["Java", "Spring Boot"]
+
+    TeacherRequestRejectRequest:
+      type: object
+      required: [reviewComment]
+      properties:
+        reviewComment:
+          type: string
+          example: "Please provide more teaching experience details."
+
+    TeacherRequestResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 10
+        userId:
+          type: integer
+          format: int64
+          example: 1
+        userEmail:
+          type: string
+          nullable: true
+          example: "user@example.com"
+        userFullName:
+          type: string
+          nullable: true
+          example: "Roman Aksenov"
+        status:
+          $ref: '#/components/schemas/TeacherRequestStatus'
+        motivation:
+          type: string
+          example: "I want to create Java courses."
+        experience:
+          type: string
+          nullable: true
+        portfolioUrl:
+          type: string
+          nullable: true
+        preferredTopics:
+          type: array
+          items:
+            type: string
+        reviewComment:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        reviewedAt:
+          type: string
+          format: date-time
+          nullable: true
+        reviewedByUserId:
+          type: integer
+          format: int64
+          nullable: true
+
+    TeacherRequestPageResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/TeacherRequestResponse'
+        page:
+          type: integer
+          example: 0
+        size:
+          type: integer
+          example: 20
+        totalItems:
+          type: integer
+          format: int64
+          example: 1
+        totalPages:
+          type: integer
+          example: 1
 
     HealthResponse:
       type: object

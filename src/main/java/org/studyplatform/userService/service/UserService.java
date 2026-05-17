@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.studyplatform.userService.dto.ChangePasswordRequest;
 import org.studyplatform.userService.dto.RegisterRequest;
 import org.studyplatform.userService.dto.UpdateProfileRequest;
+import org.studyplatform.userService.dto.UserSettingsRequest;
 import org.studyplatform.userService.entity.Role;
 import org.studyplatform.userService.entity.User;
 import org.studyplatform.userService.entity.UserStatus;
@@ -49,6 +50,7 @@ public class UserService {
         user.setRole(role);
         user.setFullName(request.getFullName());
         user.setStatus(UserStatus.ACTIVE);
+        user.setPreferredLocale("ru");
 
         try {
             User savedUser = userRepository.save(user);
@@ -92,6 +94,18 @@ public class UserService {
         user.setBio(request.getBio());
         User savedUser = userRepository.save(user);
         log.info("Updated profile for userId={}", savedUser.getId());
+        return savedUser;
+    }
+
+    @Transactional
+    public User updateSettings(String email, UserSettingsRequest request) {
+        User user = findByEmail(email);
+        user.setFullName(request.getFullName());
+        user.setAvatarUrl(request.getAvatarUrl());
+        user.setBio(request.getBio());
+        user.setPreferredLocale(request.getPreferredLocale());
+        User savedUser = userRepository.save(user);
+        log.info("Updated settings for userId={}", savedUser.getId());
         return savedUser;
     }
 
