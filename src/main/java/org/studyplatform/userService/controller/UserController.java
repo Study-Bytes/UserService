@@ -9,14 +9,18 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.studyplatform.userService.dto.ChangePasswordRequest;
 import org.studyplatform.userService.dto.CurrentUser;
+import org.studyplatform.userService.dto.PublicUserProfile;
 import org.studyplatform.userService.dto.UpdateProfileRequest;
 import org.studyplatform.userService.dto.UserSettingsRequest;
 import org.studyplatform.userService.dto.UserSettingsResponse;
 import org.studyplatform.userService.entity.User;
 import org.studyplatform.userService.service.UserService;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/users")
@@ -46,6 +50,14 @@ public class UserController {
     public UserSettingsResponse settings(Authentication authentication) {
         User user = userService.findByEmail(authentication.getName());
         return UserSettingsResponse.from(user);
+    }
+
+    @GetMapping("/public-profiles")
+    public List<PublicUserProfile> publicProfiles(@RequestParam List<Long> ids) {
+        return userService.findPublicProfilesByIds(ids)
+                .stream()
+                .map(PublicUserProfile::from)
+                .toList();
     }
 
     @PutMapping("/me/settings")
