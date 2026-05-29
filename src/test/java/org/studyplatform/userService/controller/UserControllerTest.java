@@ -19,6 +19,8 @@ import org.studyplatform.userService.entity.User;
 import org.studyplatform.userService.exception.UserNotFoundException;
 import org.studyplatform.userService.service.UserService;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.when;
@@ -151,6 +153,27 @@ class UserControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("preferredLocale")));
+    }
+
+    @Test
+    void publicProfiles_WhenAuthenticated_ShouldReturnOnlyPublicFields() throws Exception {
+        User student = user(2L, "student@example.com", "Student User", Role.STUDENT);
+        student.setAvatarUrl("https://example.com/avatar.png");
+        User teacher = user(3L, "teacher@example.com", "Teacher User", Role.TEACHER);
+        when(userService.findPublicProfilesByIds(List.of(2L, 3L))).thenReturn(List.of(student, teacher));
+
+        mockMvc.perform(get("/api/v1/users/public-profiles")
+                        .queryParam("ids", "2,3")
+                        .principal(new TestingAuthenticationToken("viewer@example.com", null, "ROLE_STUDENT")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(2))
+                .andExpect(jsonPath("$[0].fullName").value("Student User"))
+                .andExpect(jsonPath("$[0].avatarUrl").value("https://example.com/avatar.png"))
+                .andExpect(jsonPath("$[0].email").doesNotExist())
+                .andExpect(jsonPath("$[0].role").doesNotExist())
+                .andExpect(jsonPath("$[0].status").doesNotExist())
+                .andExpect(jsonPath("$[1].id").value(3))
+                .andExpect(jsonPath("$[1].fullName").value("Teacher User"));
     }
 
     @Test

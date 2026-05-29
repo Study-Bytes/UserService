@@ -20,6 +20,9 @@ import org.studyplatform.userService.exception.UserNotFoundException;
 import org.studyplatform.userService.repository.UserRepository;
 
 import java.util.Optional;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class UserService {
@@ -84,6 +87,21 @@ public class UserService {
             log.warn("User with id={} not found", id);
             return new UserNotFoundException("User not found");
         });
+    }
+
+    @Transactional(readOnly = true)
+    public List<User> findPublicProfilesByIds(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        Set<Long> normalizedIds = ids.stream()
+                .filter(id -> id != null && id > 0)
+                .limit(100)
+                .collect(Collectors.toSet());
+        if (normalizedIds.isEmpty()) {
+            return List.of();
+        }
+        return userRepository.findAllById(normalizedIds);
     }
 
     @Transactional
