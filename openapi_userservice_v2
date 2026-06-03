@@ -1,0 +1,393 @@
+openapi: 3.0.4
+info:
+  title: User Service API
+  version: 2.0.0
+  description: >
+    Сервис управления пользователями и аутентификацией. Обрабатывает регистрацию, вход, 
+    обновление токенов, выход и управление профилями пользователей.
+servers:
+  - url: http://localhost:8081
+    description: Local Dev Server
+
+tags:
+  - name: Authentication
+    description: Регистрация, вход, обновление токенов, выход
+  - name: Users
+    description: Управление пользователями и профилями
+
+paths:
+  /api/v1/auth/register:
+    post:
+      summary: Регистрация нового пользователя
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '200':
+          description: Пользователь успешно зарегистрирован
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "User registered successfully"
+        '400':
+          description: Ошибка валидации запроса (невалидный email, пароль короче 6 символов)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                message: "email: Invalid email format"
+                code: 400
+                timestamp: "2026-02-24T12:00:00Z"
+        '409':
+          description: Пользователь с таким email уже существует
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                message: "User with email already exists: user@example.com"
+                code: 409
+                timestamp: "2026-02-24T12:00:00Z"
+        '500':
+          description: Ошибка сервиса
+
+  /api/v1/auth/login:
+    post:
+      summary: Аутентификация пользователя
+      tags: [Authentication]
+      description: >
+        При успешной аутентификации выдаются access и refresh токены.
+        Access токен действителен 15 минут, refresh токен — 7 дней.
+        Все предыдущие refresh токены пользователя автоматически отзываются.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Успешная аутентификация
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Ошибка валидации запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                message: "email: must not be blank"
+                code: 400
+                timestamp: "2026-02-24T12:00:00Z"
+        '401':
+          description: Неверный email или пароль
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                message: "Invalid email or password"
+                code: 401
+                timestamp: "2026-02-24T12:00:00Z"
+        '500':
+          description: Ошибка сервиса
+
+  /api/v1/auth/refresh:
+    post:
+      summary: Обновление access токена
+      tags: [Authentication]
+      description: >
+        Используйте refresh токен для получения нового access токена.
+        Refresh токен проверяется по базе данных на валидность и отсутствие отзыва.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '200':
+          description: Новый access токен выдан
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken:
+                    type: string
+                    description: Новый JWT access токен (действителен 15 минут)
+                    example: "eyJhbGciOiJIUzI1NiJ9.eyJzdWIi..."
+        '400':
+          description: Ошибка валидации запроса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                message: "refreshToken: must not be blank"
+                code: 400
+                timestamp: "2026-02-24T12:00:00Z"
+        '401':
+          description: Refresh токен невалидный, истёк или отозван
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                message: "Invalid or expired refresh token"
+                code: 401
+                timestamp: "2026-02-24T12:00:00Z"
+        '500':
+          description: Ошибка сервиса
+
+  /api/v1/auth/logout:
+    post:
+      summary: Выход из системы (отзыв refresh токенов)
+      tags: [Authentication]
+      description: >
+        Отзывает все refresh токены пользователя. Пользователь будет разлогинен 
+        на всех устройствах. Access токены продолжат работать до истечения срока (15 минут).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '200':
+          description: Успешный выход, все refresh токены отозваны
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Logged out successfully"
+        '400':
+          description: Refresh токен не предоставлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                message: "Refresh token is required for logout"
+                code: 400
+                timestamp: "2026-02-24T12:00:00Z"
+        '401':
+          description: Refresh токен не найден в базе данных
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                message: "Refresh token not found"
+                code: 401
+                timestamp: "2026-02-24T12:00:00Z"
+        '500':
+          description: Ошибка сервиса
+
+  /api/v1/users/me:
+    get:
+      summary: Получить профиль текущего пользователя
+      tags: [Users]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Профиль пользователя
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDto'
+        '401':
+          description: Access токен отсутствует, невалидный или истёк
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                message: "Full authentication is required"
+                code: 401
+                timestamp: "2026-02-24T12:00:00Z"
+        '500':
+          description: Ошибка сервиса
+
+  /api/v1/users/{id}:
+    get:
+      summary: Получить пользователя по ID (только для администраторов)
+      tags: [Users]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: ID пользователя
+      responses:
+        '200':
+          description: Информация о пользователе
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDto'
+        '401':
+          description: Access токен отсутствует, невалидный или истёк
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                message: "Full authentication is required"
+                code: 401
+                timestamp: "2026-02-24T12:00:00Z"
+        '403':
+          description: Недостаточно прав (требуется роль ADMIN)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                message: "Access Denied"
+                code: 403
+                timestamp: "2026-02-24T12:00:00Z"
+        '404':
+          description: Пользователь не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                message: "User not found"
+                code: 404
+                timestamp: "2026-02-24T12:00:00Z"
+        '500':
+          description: Ошибка сервиса
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >
+        JWT токен, полученный при аутентификации через /auth/login.
+        Токен должен быть передан в заголовке Authorization: Bearer <token>
+
+  schemas:
+    RegisterRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          description: Email пользователя (должен быть уникальным)
+          example: "user@example.com"
+        password:
+          type: string
+          minLength: 6
+          description: Пароль (минимум 6 символов)
+          example: "securePassword123"
+        fullName:
+          type: string
+          description: Полное имя пользователя (опционально)
+          example: "Иван Иванов"
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          example: "user@example.com"
+        password:
+          type: string
+          example: "securePassword123"
+
+    RefreshRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+          description: Refresh токен, полученный при логине
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+
+    AuthResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+          description: JWT access токен (действителен 15 минут)
+          example: "eyJhbGciOiJIUzI1NiJ9.eyJzdWIi..."
+        refreshToken:
+          type: string
+          description: JWT refresh токен (действителен 7 дней)
+          example: "eyJhbGciOiJIUzI1NiJ9.eyJzdWIi..."
+        userId:
+          type: integer
+          format: int64
+          description: ID пользователя
+          example: 123
+        email:
+          type: string
+          description: Email пользователя
+          example: "user@example.com"
+        role:
+          type: string
+          enum: [STUDENT, TEACHER, ADMIN]
+          description: Роль пользователя
+          example: "STUDENT"
+
+    UserDto:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: ID пользователя
+          example: 2
+        email:
+          type: string
+          description: Email пользователя
+          example: "test2@mail.com"
+        fullName:
+          type: string
+          description: Полное имя пользователя
+          example: "Тест Тестов"
+        role:
+          type: string
+          enum: [STUDENT, TEACHER, ADMIN]
+          description: Роль пользователя в системе
+          example: "STUDENT"
+
+    ErrorResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Описание ошибки
+        code:
+          type: integer
+          description: HTTP код ошибки
+        timestamp:
+          type: string
+          format: date-time
+          description: Время возникновения ошибки
