@@ -17,12 +17,6 @@ UserService - микросервис пользователей и аутент�
 - Docker Compose
 - GitHub Actions
 
-## Документы для курсовой работы
-
-Формальные документы для сдачи курсовой находятся в отдельной директории:
-
-- [Руководство оператора](coursework-docs/operator-manual.md)
-- [Программа и методика испытаний](coursework-docs/test-program-and-methodology.md)
 
 ## Ответственность
 
@@ -37,7 +31,6 @@ UserService отвечает на вопрос:
 - учетные записи пользователей;
 - email, хеш пароля, полное имя, роль и статус пользователя;
 - настройки аккаунта: avatarUrl, bio и preferredLocale (`ru` или `en`);
-- заявки пользователей на получение роли TEACHER и результат модерации;
 - refresh tokens в виде хешей;
 - состояние отзыва refresh tokens;
 - настройки выпуска JWT access и refresh tokens.
@@ -49,7 +42,6 @@ UserService отвечает на вопрос:
 - прогресс обучения;
 - попытки решения задач;
 - результаты выполнения кода;
-- комментарии и обсуждения.
 
 Эти данные должны принадлежать другим сервисам платформы, например CourseService, LearningService или CodeExecutorService.
 
@@ -73,7 +65,6 @@ ADMIN
 
 `RefreshToken` хранит не исходный token, а его hash. При logout UserService отзывает refresh tokens пользователя. Access tokens остаются действительными до истечения короткого срока жизни.
 
-`TeacherRequest` хранит заявку STUDENT-пользователя на роль TEACHER. Администратор может одобрить заявку, тогда роль пользователя меняется на `TEACHER`, или отклонить ее с комментарием.
 
 ## Публичная Auth API
 
@@ -150,6 +141,7 @@ Endpoints:
 ```text
 GET /api/v1/users/me
 GET /api/v1/users/me/settings
+GET /api/v1/users/public-profiles?ids={ids}
 PUT /api/v1/users/me/settings
 PUT /api/v1/users/me/password
 GET /api/v1/users/{id}
@@ -162,6 +154,11 @@ Authorization: Bearer <access-token>
 ```
 
 `GET /api/v1/users/{id}` возвращает пользователя по ID. Endpoint доступен только пользователю с ролью `ADMIN`.
+
+`GET /api/v1/users/public-profiles?ids={ids}` возвращает безопасные публичные профили для списка пользователей.
+Endpoint доступен authenticated пользователям и используется BFF для обогащения leaderboard. `ids` передается
+comma-separated списком user id, например `ids=5,21,1`. Ответ содержит только `id`, `fullName`, `avatarUrl` и не
+возвращает `email`, `role`, `status`, `bio`, `preferredLocale` или внутренние поля.
 
 `GET /api/v1/users/me/settings` возвращает настройки аккаунта текущего пользователя.
 
@@ -267,8 +264,7 @@ UserService разделяет публичные и защищенные endpoi
 ```text
 /health                              -> public
 /swagger-ui.html, /swagger-ui/**     -> public в текущей конфигурации
-/v3/api-docs/**                      -> public в текущей конфигурации
-/api/v1/auth/register                -> public
+//api/v1/auth/register                -> public
 /api/v1/auth/login                   -> public
 /api/v1/auth/refresh                 -> public
 /api/v1/auth/.well-known/jwks.json   -> public
@@ -284,8 +280,6 @@ UserService разделяет публичные и защищенные endpoi
 
 Spring Security работает в stateless-режиме:
 
-- CSRF отключен;
-- HTTP session не используется;
 - каждый защищенный запрос проходит через JWT filter;
 - пароль хранится через BCrypt hash;
 - access token передается в `Authorization: Bearer <token>`.
@@ -397,44 +391,55 @@ git diff --exit-code openapi.yml
 
 ## Переменные окружения
 
-| Переменная | Значение по умолчанию | Описание |
-| --- | --- | --- |
-| `SERVER_PORT` | `8081` | HTTP порт UserService |
+| Переменная | Значение по умолчанию                           | Описание |
+| --- |-------------------------------------------------| --- |
+| `SERVER_PORT` | `8081`                                          | HTTP порт UserService |
 | `DB_URL` | `jdbc:postgresql://localhost:5432/user_service` | JDBC URL PostgreSQL |
-| `DB_USERNAME` | `postgres` | Пользователь PostgreSQL |
-| `DB_PASSWORD` | `postgres` | Пароль PostgreSQL |
-| `POSTGRES_DB` | `user_service` | Имя базы PostgreSQL в Docker Compose |
-| `POSTGRES_USER` | `postgres` | Пользователь PostgreSQL в Docker Compose |
-| `POSTGRES_PASSWORD` | `postgres` | Пароль PostgreSQL в Docker Compose |
-| `USER_BACKEND_NETWORK` | `studybytes_backend_net` | Общая Docker network для Nginx/BFF/микросервисов |
-| `USER_DB_NETWORK` | `user_db_net` | Внутренняя Docker network для UserService и PostgreSQL |
-| `JWT_PRIVATE_KEY` | пусто | RSA private key в PEM формате |
-| `JWT_KEY_ID` | `user-service-rsa-1` | `kid` публичного ключа в JWKS |
-| `JWT_ISSUER` | `study-platform-user-service` | JWT issuer |
-| `JWT_AUDIENCE` | `study-platform` | JWT audience |
-| `JWT_ACCESS_EXPIRATION_MINUTES` | `15` | Время жизни access token |
-| `JWT_REFRESH_EXPIRATION_DAYS` | `7` | Время жизни refresh token |
-| `JPA_DDL_AUTO` | `update` | Режим Hibernate schema generation |
-| `JPA_SHOW_SQL` | `false` | Печать SQL запросов |
-| `HIBERNATE_FORMAT_SQL` | `false` | Форматирование SQL логов |
-| `FLYWAY_ENABLED` | `false` | Включение Flyway |
+| `DB_USERNAME` | `postgres`                                      | Пользователь PostgreSQL |
+| `DB_PASSWORD` | `postgres`                                      | Пароль PostgreSQL |
+| `POSTGRES_DB` | `user_service`                                  | Имя базы PostgreSQL в Docker Compose |
+| `POSTGRES_USER` | `postgres`                                      | Пользователь PostgreSQL в Docker Compose |
+| `POSTGRES_PASSWORD` | `postgres`                                      | Пароль PostgreSQL в Docker Compose |
+| `USER_BACKEND_NETWORK` | `studybytes_backend_net`                        | Общая Docker network для Nginx/BFF/микросервисов |
+| `USER_DB_NETWORK` | `user_db_net`                                   | Внутренняя Docker network для UserService и PostgreSQL |
+| `JWT_PRIVATE_KEY` | пусто (при default)                             | RSA private key в PEM формате |
+| `JWT_KEY_ID` | `user-service-rsa-1`                            | `kid` публичного ключа в JWKS |
+| `JWT_ISSUER` | `study-platform-user-service`                   | JWT issuer |
+| `JWT_AUDIENCE` | `study-platform`                                | JWT audience |
+| `JWT_ACCESS_EXPIRATION_MINUTES` | `15`                                            | Время жизни access token |
+| `JWT_REFRESH_EXPIRATION_DAYS` | `7`                                             | Время жизни refresh token |
+| `JPA_DDL_AUTO` | `false`                                         | Режим Hibernate schema generation |
+| `JPA_SHOW_SQL` | `false`                                         | Печать SQL запросов |
+| `HIBERNATE_FORMAT_SQL` | `false`                                         | Форматирование SQL логов |
+| `FLYWAY_ENABLED` | `true`                                          | Включение Flyway |
+| `FLYWAY_BASELINE_ON_MIGRATE` | `true`                                          | Baseline для существующей схемы при включении Flyway |
+| `LOG_LEVEL_ROOT` | `INFO`                                          | Root log level |
+| `LOG_LEVEL_WEB` | `INFO`                                          | Spring Web log level |
+| `LOG_LEVEL_SECURITY` | `INFO`                                          | Spring Security log level |
+| `LOG_LEVEL_USERSERVICE` | `DEBUG`                                         | Log level пакета UserService |
 
-## Upgrade note (V2 Flyway repair)
+## Примечание по обновлению: V2 Flyway repair
 
-Если в боевой БД уже есть таблица `users`, но отсутствует колонка `preferred_locale` (или не применились account settings / teacher request изменения), включите Flyway и перезапустите сервис один раз:
+Этот пункт относится к существующим базам данных, которые были созданы до изменений схемы для настроек аккаунта и заявок на роль преподавателя.
+
+Миграция `V2__repair_schema_for_account_settings_and_teacher_requests.sql` безопасна для повторного запуска. Она добавляет недостающие колонки профиля и настроек пользователя, а также создает таблицу `teacher_requests`, если ее еще нет. Это позволяет привести старую схему UserService к текущему состоянию без удаления таблиц и потери данных.
+
+Рекомендуемый порядок обновления для такого окружения:
+
+1. Сделайте backup базы данных.
+2. Убедитесь, что миграции Flyway применяются при старте UserService.
+3. Используйте `FLYWAY_BASELINE_ON_MIGRATE=true`, если в базе уже есть таблицы, но еще нет таблицы истории Flyway.
+4. Пересоберите и перезапустите UserService.
+5. Проверьте логи сервиса и endpoint `/health`.
+
+Пример:
 
 ```bash
-FLYWAY_ENABLED=true
 FLYWAY_BASELINE_ON_MIGRATE=true
 docker compose up -d --build user-service
 ```
 
-Миграция `V2__repair_schema_for_account_settings_and_teacher_requests.sql` добавляет недостающие поля и таблицу `teacher_requests` для legacy-схем после baseline.
-| `FLYWAY_BASELINE_ON_MIGRATE` | `true` | Baseline для существующей схемы при включении Flyway |
-| `LOG_LEVEL_ROOT` | `INFO` | Root log level |
-| `LOG_LEVEL_WEB` | `INFO` | Spring Web log level |
-| `LOG_LEVEL_SECURITY` | `INFO` | Spring Security log level |
-| `LOG_LEVEL_USERSERVICE` | `DEBUG` | Log level пакета UserService |
+Не удаляйте существующие таблицы для этого исправления. Если миграция завершилась ошибкой, сначала посмотрите ошибку Flyway и исправьте конкретное несовпадение схемы.
 
 ## Генерация RSA Private Key
 
@@ -738,13 +743,3 @@ curl -fsS http://127.0.0.1:8081/health
 `Invalid or expired refresh token` означает, что refresh token невалиден, истек, отозван или не найден в базе.
 
 `JWT_PRIVATE_KEY` без стабильного значения приводит к генерации нового ключа при каждом старте. После рестарта ранее выпущенные tokens могут перестать проходить проверку подписи.
-
-## Правила дальнейшей разработки
-
-- Не добавлять в access token секретные данные.
-- Не возвращать password hash через API.
-- Не хранить refresh token в базе в открытом виде.
-- Не коммитить `.env` и приватные ключи.
-- После изменения публичного API обновлять `openapi.yml`.
-- После изменения security logic запускать тесты контроллеров и security tests.
-- Другие сервисы должны проверять JWT через JWKS, а не через общий secret.

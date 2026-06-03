@@ -2,8 +2,6 @@ package org.studyplatform.userService.dto;
 
 import jakarta.validation.constraints.NotBlank;
 
-//dto для обмена refresh-token на новый access-token
-
 public class RefreshRequest {
     @NotBlank
     private String refreshToken;

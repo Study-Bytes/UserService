@@ -13,7 +13,7 @@ public class User {
     private String email;
 
     @Column(nullable = false)
-    private String password; // BCrypt-hash
+    private String password;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
