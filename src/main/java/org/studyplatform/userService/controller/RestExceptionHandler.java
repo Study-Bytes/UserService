@@ -23,7 +23,6 @@ import java.util.Map;
 public class RestExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(RestExceptionHandler.class);
 
-    //409 ошибка на дублирующий email
     @ExceptionHandler(EmailAlreadyTakenException.class)
     public ResponseEntity<?> handleEmailTaken(EmailAlreadyTakenException e) {
         log.warn("Email conflict: {}", e.getMessage());
@@ -36,14 +35,12 @@ public class RestExceptionHandler {
         return buildError(HttpStatus.CONFLICT, e.getMessage());
     }
 
-    //404 пользователь не найден
     @ExceptionHandler({UsernameNotFoundException.class, EntityNotFoundException.class, UserNotFoundException.class})
     public ResponseEntity<?> handleNotFound(RuntimeException e) {
         log.warn("Not found: {}", e.getMessage());
         return buildError(HttpStatus.NOT_FOUND, e.getMessage());
     }
 
-    //400 ошибка на невалидный email и короткий пароль
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<?> handleValidation(MethodArgumentNotValidException e) {
         String message = e.getBindingResult().getFieldErrors().stream()
@@ -60,21 +57,18 @@ public class RestExceptionHandler {
         return buildError(HttpStatus.BAD_REQUEST, e.getMessage());
     }
 
-    // 401 — невалидный или отозванный токен
     @ExceptionHandler(InvalidTokenException.class)
     public ResponseEntity<?> handleInvalidToken(InvalidTokenException e) {
         log.warn("Invalid token: {}", e.getMessage());
         return buildError(HttpStatus.UNAUTHORIZED, e.getMessage());
     }
 
-    // 401 — неверные credentials при логине
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<?> handleBadCredentials(BadCredentialsException e) {
         log.warn("Bad credentials: {}", e.getMessage());
         return buildError(HttpStatus.UNAUTHORIZED, "Invalid email or password");
     }
 
-    //500 все остальное
     @ExceptionHandler(Exception.class)
     public ResponseEntity<?> handleOther(Exception e) {
         log.error("Internal error: {}", e.getMessage(), e);

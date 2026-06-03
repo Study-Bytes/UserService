@@ -5,7 +5,6 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import org.studyplatform.userService.entity.Role;
 
-// DTO для регистрации
 public class RegisterRequest {
     @Email
     @NotBlank

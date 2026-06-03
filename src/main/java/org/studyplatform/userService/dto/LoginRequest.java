@@ -3,8 +3,6 @@ package org.studyplatform.userService.dto;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 
-//dto для логина
-
 public class LoginRequest {
     @Email
     @NotBlank
